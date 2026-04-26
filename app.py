@@ -1,0 +1,218 @@
+"""
+Kişisel Finans Öneri Asistanı — Flask Web Arayüzü
+"""
+import os, sys, json
+import numpy as np
+import pandas as pd
+import skfuzzy as fuzz
+from flask import Flask, render_template, jsonify
+
+app = Flask(__name__)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OZET_PATH  = os.path.join(BASE_DIR, "ozet_hesaplar.csv")
+BANKA_PATH = os.path.join(BASE_DIR, "banka_hareketleri.csv")
+
+# ── Üyelik fonksiyon yardımcısı ──────────────────────────────
+x = np.linspace(0, 1, 1000)
+y = np.linspace(0, 1, 1000)
+
+def interp(arr, mf, val):
+    return float(fuzz.interp_membership(arr, mf, val))
+
+def mf_to_points(x_arr, mf_arr, steps=200):
+    """Grafik için (x,y) nokta listesi döndür."""
+    idx = np.round(np.linspace(0, len(x_arr)-1, steps)).astype(int)
+    return [{"x": round(float(x_arr[i]),4), "y": round(float(mf_arr[i]),4)} for i in idx]
+
+def run_fuzzy():
+    # ── CSV Oku ──────────────────────────────────────────────
+    ozet  = pd.read_csv(OZET_PATH)
+    banka = pd.read_csv(BANKA_PATH)
+    ozet.columns  = ozet.columns.str.strip()
+    banka.columns = banka.columns.str.strip()
+
+    esn  = float(ozet["Esneklik Oranı (0-1)"].iloc[0])
+    duz  = float(ozet["Gelir Düzenlilik Skoru (0-1)"].iloc[0])
+    risk = float(ozet["Risk Tolerans (0-1)"].iloc[0])
+
+    # ── Banka Analizi ───────────────────────────────────────
+    banka["Tutar"] = pd.to_numeric(banka["Tutar"], errors="coerce")
+    banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce")
+    banka["Ay"]    = banka["Tarih"].dt.to_period("M")
+
+    gelirler = banka[banka["Tutar"] > 0]
+    giderler = banka[banka["Tutar"] < 0].copy()
+    giderler["Abs"] = giderler["Tutar"].abs()
+
+    aylik_gelir  = gelirler.groupby("Ay")["Tutar"].sum()
+    aylik_gider  = giderler.groupby("Ay")["Abs"].sum()
+    aylik_tasarruf = aylik_gelir.subtract(aylik_gider, fill_value=0)
+
+    kat_gider = giderler.groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
+
+    # Aylık trend için ay bazında gelir/gider
+    aylar = sorted(set(list(aylik_gelir.index) + list(aylik_gider.index)))
+    monthly_labels = [str(a) for a in aylar]
+    monthly_gelir  = [round(float(aylik_gelir.get(a, 0)), 2) for a in aylar]
+    monthly_gider  = [round(float(aylik_gider.get(a, 0)), 2) for a in aylar]
+    monthly_tas    = [round(float(aylik_tasarruf.get(a, 0)), 2) for a in aylar]
+
+    # ── Üyelik Fonksiyonları ─────────────────────────────────
+    mf = {
+        "duz": {
+            "Düzensiz": fuzz.trapmf(x,[0.0,0.0,0.30,0.50]),
+            "Orta"    : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
+            "Düzenli" : fuzz.trapmf(x,[0.50,0.70,1.0,1.0]),
+        },
+        "esn": {
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
+            "Orta"   : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
+            "Yüksek" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+        },
+        "risk": {
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
+            "Orta"   : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
+            "Yüksek" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+        },
+    }
+    mf_out = {
+        "Güvenilir": fuzz.trapmf(y,[0.0,0.0,0.20,0.33]),
+        "Dengeli"  : fuzz.trapmf(y,[0.25,0.38,0.52,0.65]),
+        "Agresif"  : fuzz.trapmf(y,[0.55,0.67,1.0,1.0]),
+    }
+
+    # ── Bulanıklaştırma ──────────────────────────────────────
+    deg_duz  = {k: interp(x, v, duz)  for k,v in mf["duz"].items()}
+    deg_esn  = {k: interp(x, v, esn)  for k,v in mf["esn"].items()}
+    deg_risk = {k: interp(x, v, risk) for k,v in mf["risk"].items()}
+
+    # ── Kurallar (Mamdani, min) ──────────────────────────────
+    kurallar = [
+        (deg_risk["Düşük"], "Güvenilir",
+         "K1", "Risk = Düşük", "Güvenilir"),
+        (min(deg_risk["Orta"],deg_esn["Düşük"],deg_duz["Düzensiz"]), "Güvenilir",
+         "K2", "Risk=Orta & Esn=Düşük & Gel=Düzensiz", "Güvenilir"),
+        (min(deg_risk["Orta"],deg_esn["Düşük"],deg_duz["Orta"]), "Güvenilir",
+         "K3", "Risk=Orta & Esn=Düşük & Gel=Orta", "Güvenilir"),
+        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Düzensiz"]), "Güvenilir",
+         "K4", "Risk=Orta & Esn=Orta & Gel=Düzensiz", "Güvenilir"),
+        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Orta"]), "Dengeli",
+         "K5", "Risk=Orta & Esn=Orta & Gel=Orta", "Dengeli"),
+        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Düzenli"]), "Dengeli",
+         "K6", "Risk=Orta & Esn=Orta & Gel=Düzenli", "Dengeli"),
+        (min(deg_risk["Orta"],deg_esn["Yüksek"],deg_duz["Orta"]), "Dengeli",
+         "K7", "Risk=Orta & Esn=Yüksek & Gel=Orta", "Dengeli"),
+        (min(deg_risk["Orta"],deg_esn["Yüksek"],deg_duz["Düzenli"]), "Agresif",
+         "K8", "Risk=Orta & Esn=Yüksek & Gel=Düzenli", "Agresif"),
+        (deg_risk["Yüksek"], "Agresif",
+         "K9", "Risk = Yüksek", "Agresif"),
+    ]
+
+    rules_out = []
+    for akt, label, kid, cond, sonuc in kurallar:
+        rules_out.append({
+            "id": kid, "condition": cond,
+            "conclusion": sonuc, "activation": round(akt, 4),
+            "active": akt > 0.001
+        })
+
+    # ── Agregasyon & Defuzz ───────────────────────────────────
+    max_g = max(a for a,l,*_ in kurallar if l=="Güvenilir")
+    max_d = max(a for a,l,*_ in kurallar if l=="Dengeli")
+    max_a = max(a for a,l,*_ in kurallar if l=="Agresif")
+
+    agr_g = np.fmin(max_g, mf_out["Güvenilir"])
+    agr_d = np.fmin(max_d, mf_out["Dengeli"])
+    agr_a = np.fmin(max_a, mf_out["Agresif"])
+    agregasyon = np.fmax(agr_g, np.fmax(agr_d, agr_a))
+
+    defuzz_val = fuzz.defuzz(y, agregasyon, "centroid") if np.sum(agregasyon)>0 else 0.165
+
+    if defuzz_val <= 0.33:   profil = "Güvenilir"
+    elif defuzz_val <= 0.66: profil = "Dengeli"
+    else:                    profil = "Agresif"
+
+    portfolyolar = {
+        "Güvenilir": {
+            "desc": "Sermaye koruma odaklı, düşük riskli portföy",
+            "color": "#22d3ee",
+            "items": {"Devlet Tahvili/Bono":45,"Mevduat/TL Mevduat":25,
+                      "Altın":15,"Hisse Senedi (BIST-30)":10,"Döviz (USD/EUR)":5}
+        },
+        "Dengeli": {
+            "desc": "Risk-getiri dengesi gözeten, orta vadeli portföy",
+            "color": "#a78bfa",
+            "items": {"Hisse Senedi (BIST-100)":30,"Devlet Tahvili/Bono":25,
+                      "Altın":20,"Döviz (USD/EUR)":15,"Kripto (BTC/ETH)":10}
+        },
+        "Agresif": {
+            "desc": "Yüksek getiri hedefli, yüksek risk toleranslı portföy",
+            "color": "#fb923c",
+            "items": {"Hisse Senedi (BIST/Yurt dışı)":45,"Kripto (BTC/ETH)":25,
+                      "Emtia (Petrol/Altın)":15,"Döviz":10,"Girişim/Fon":5}
+        },
+    }
+
+    # MF grafik verileri
+    mf_charts = {
+        "gelir_duzenliligi": {
+            "value": round(duz,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["duz"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_duz.items()}
+        },
+        "esneklik_orani": {
+            "value": round(esn,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["esn"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_esn.items()}
+        },
+        "risk_toleransi": {
+            "value": round(risk,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["risk"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_risk.items()}
+        },
+    }
+
+    output_chart = {
+        "curves": {k: mf_to_points(y, v) for k,v in mf_out.items()},
+        "aggregation": mf_to_points(y, agregasyon),
+        "defuzz": round(float(defuzz_val),4),
+        "activations": {"Güvenilir": round(max_g,4), "Dengeli": round(max_d,4), "Agresif": round(max_a,4)}
+    }
+
+    return {
+        "inputs": {"esneklik": round(esn,4), "duzenlilik": round(duz,4), "risk": round(risk,4)},
+        "mf_charts": mf_charts,
+        "output_chart": output_chart,
+        "rules": rules_out,
+        "defuzz": round(float(defuzz_val),4),
+        "profil": profil,
+        "portfolyo": portfolyolar[profil],
+        "banka": {
+            "toplam_gelir": round(float(banka[banka["Tutar"]>0]["Tutar"].sum()),2),
+            "toplam_gider": round(float(banka[banka["Tutar"]<0]["Tutar"].abs().sum()),2),
+            "aylik_gelir_ort": round(float(aylik_gelir.mean()),2),
+            "aylik_gider_ort": round(float(aylik_gider.mean()),2),
+            "aylik_tasarruf_ort": round(float(aylik_tasarruf.mean()),2),
+            "istege_bagli": round(float(kat_gider.get("İsteğe Bağlı",0)),2),
+            "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
+            "monthly": {
+                "labels": monthly_labels,
+                "gelir": monthly_gelir,
+                "gider": monthly_gider,
+                "tasarruf": monthly_tas
+            }
+        }
+    }
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/api/data")
+def api_data():
+    data = run_fuzzy()
+    return jsonify(data)
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5050)

@@ -1,0 +1,25 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and local caches
+.venv/
+.venv_*/
+.paddlex_cache/
+
+# Local model artifacts
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# Sensitive local documents and OCR inputs
+Hesap_Hareketleri_*.pdf
+
+# Runtime outputs
+*.log
