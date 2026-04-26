@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import skfuzzy as fuzz
 from flask import Flask, render_template, jsonify
+from transaction_classifier import classify_dataframe, parse_amount
 
 app = Flask(__name__)
 
@@ -37,7 +38,8 @@ def run_fuzzy():
     risk = float(ozet["Risk Tolerans (0-1)"].iloc[0])
 
     # ── Banka Analizi ───────────────────────────────────────
-    banka["Tutar"] = pd.to_numeric(banka["Tutar"], errors="coerce")
+    banka = classify_dataframe(banka)
+    banka["Tutar"] = banka["Tutar"].apply(parse_amount)
     banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce")
     banka["Ay"]    = banka["Tarih"].dt.to_period("M")
 
@@ -50,6 +52,9 @@ def run_fuzzy():
     aylik_tasarruf = aylik_gelir.subtract(aylik_gider, fill_value=0)
 
     kat_gider = giderler.groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
+    esnek_gider_tipleri = ["Kısılabilir", "İsteğe Bağlı"]
+    esnek_gider = giderler[giderler["Gider Tipi"].isin(esnek_gider_tipleri)]["Abs"].sum()
+    dusuk_guven = banka[banka["Sınıflandırma Güveni"] < 0.50].copy()
 
     # Aylık trend için ay bazında gelir/gider
     aylar = sorted(set(list(aylik_gelir.index) + list(aylik_gider.index)))
@@ -194,8 +199,24 @@ def run_fuzzy():
             "aylik_gelir_ort": round(float(aylik_gelir.mean()),2),
             "aylik_gider_ort": round(float(aylik_gider.mean()),2),
             "aylik_tasarruf_ort": round(float(aylik_tasarruf.mean()),2),
-            "istege_bagli": round(float(kat_gider.get("İsteğe Bağlı",0)),2),
+            "istege_bagli": round(float(esnek_gider),2),
             "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
+            "siniflandirma": {
+                "toplam": int(len(banka)),
+                "dusuk_guven_adedi": int(len(dusuk_guven)),
+                "yontemler": {k: int(v) for k, v in banka["Sınıflandırma Yöntemi"].value_counts().items()},
+                "dusuk_guven_ornekleri": [
+                    {
+                        "tarih": "" if pd.isna(row["Tarih"]) else str(row["Tarih"].date()),
+                        "aciklama": str(row.get("Açıklama", "")),
+                        "tutar": round(float(row.get("Tutar", 0)), 2),
+                        "kategori": str(row.get("Kategori", "")),
+                        "gider_tipi": str(row.get("Gider Tipi", "")),
+                        "guven": round(float(row.get("Sınıflandırma Güveni", 0)), 2),
+                    }
+                    for _, row in dusuk_guven.head(10).iterrows()
+                ],
+            },
             "monthly": {
                 "labels": monthly_labels,
                 "gelir": monthly_gelir,

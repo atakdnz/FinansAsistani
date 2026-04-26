@@ -249,6 +249,7 @@ function fmt(n){return new Intl.NumberFormat('tr-TR',{maximumFractionDigits:0}).
 function render(d){
   const pc = profileColor(d.profil);
   const pct = Math.round(d.defuzz*100);
+  const cls = d.banka.siniflandirma || {toplam:0,dusuk_guven_adedi:0,yontemler:{},dusuk_guven_ornekleri:[]};
 
   const mfKeys = [
     ['gelir_duzenliligi','Gelir Düzenliliği','mf1'],
@@ -295,8 +296,35 @@ function render(d){
       <div class="stat-sub">Net birikim</div></div>
     <div class="card"><div class="card-title">Tasarruf Potansiyeli</div>
       <div class="stat-val yellow">${fmt(d.banka.istege_bagli)}<span style="font-size:.9rem"> TL</span></div>
-      <div class="stat-sub">İsteğe bağlı gider / yıl</div></div>
+      <div class="stat-sub">Kısılabilir + isteğe bağlı gider / yıl</div></div>
   </div>
+
+  <!-- Sınıflandırma -->
+  <div class="section-title"><span>🏷️</span> İşlem Sınıflandırma Özeti</div>
+  <div class="grid3">
+    <div class="card"><div class="card-title">Toplam İşlem</div>
+      <div class="stat-val cyan">${fmt(cls.toplam)}</div>
+      <div class="stat-sub">Açıklama + tutar üzerinden sınıflandırıldı</div></div>
+    <div class="card"><div class="card-title">Düşük Güven</div>
+      <div class="stat-val ${cls.dusuk_guven_adedi ? 'yellow' : 'green'}">${fmt(cls.dusuk_guven_adedi)}</div>
+      <div class="stat-sub">Gözden geçirilecek belirsiz kayıt</div></div>
+    <div class="card"><div class="card-title">Yöntem Dağılımı</div>
+      ${Object.entries(cls.yontemler).map(([k,v])=>`
+        <div class="kat-item">
+          <div class="kat-name">${k}</div>
+          <div class="kat-amt cyan">${fmt(v)}</div>
+        </div>`).join('') || '<div class="stat-sub">Kayıt yok</div>'}
+    </div>
+  </div>
+  ${cls.dusuk_guven_ornekleri.length ? `
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">Düşük Güvenli Örnekler</div>
+    ${cls.dusuk_guven_ornekleri.map(r=>`
+      <div class="kat-item">
+        <div class="kat-name">${r.aciklama}</div>
+        <div class="kat-amt">${r.kategori} · ${r.gider_tipi} · ${r.guven.toFixed(2)}</div>
+      </div>`).join('')}
+  </div>` : ''}
 
   <!-- Bulanık girdiler -->
   <div class="section-title"><span>🔬</span> Bulanıklaştırma — Üyelik Fonksiyonları</div>
