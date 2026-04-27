@@ -75,6 +75,7 @@ Yeni 6 girdili fuzzy degisiklikleri:
 - 10 TL ve altindaki mikro tahsilatlar analiz ve arayuz listesinden ayrildi.
 - Kategori bazli oneri kartlari eklendi.
 - Pasif fuzzy kurallari arayuzde katlanabilir bolume tasindi.
+- Arayuz iki moda ayrildi: varsayilan `Oneri Paneli` kullanici odakli sade ekran, `Teknik Analiz` mevcut detayli fuzzy/OCR ekranidir.
 
 ## Calisma Ortami
 
@@ -253,6 +254,8 @@ Kategori prototipleri ile islem aciklamasi embedding uzayinda karsilastirilir. A
 Tek sayfalik dashboard:
 
 - PDF yukleme.
+- Varsayilan Oneri Paneli: profil skoru, portfoy, temel finans ozeti, iki risk/vade sorusu ve kisisel tasarruf onerileri.
+- Teknik Analiz sekmesi: OCR kontrolu, siniflandirma, fuzzy uyelik grafikleri, kural aktivasyonlari, agregasyon ve centroid.
 - Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card.
 - OCR islem kontrol ve manuel duzeltme tablosu.
 - Gelir/gider ozetleri.

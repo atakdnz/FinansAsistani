@@ -22,8 +22,19 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 - `statement_pdf_pipeline.py`: PDF render, PaddleOCR, satir ayrisma ve CSV uretimi.
 - `transaction_classifier.py`: Kural tabanli deterministik islem siniflandirma.
 - `embedding_classifier.py`: Dusuk guvenli kayitlar icin opsiyonel embedding onerisi.
-- `templates/index.html`: PDF yukleme, OCR islem duzeltme tablosu, risk profili, tasarruf simulatoru ve analiz dashboard'u.
+- `templates/index.html`: PDF yukleme, sade Oneri Paneli, Teknik Analiz modu, OCR islem duzeltme tablosu, risk profili, tasarruf simulatoru ve analiz dashboard'u.
 - `PROJECT_OVERVIEW.md`: Ekip icin kod rehberi, mevcut durum ve gelistirme onerileri.
+
+## Arayuz Modlari
+
+Uygulama iki modla acilir:
+
+- **Oneri Paneli:** Varsayilan kullanici ekrani. Yalnizca profil, portfoy,
+  temel finans ozeti, risk/vade sorulari ve kisisel tasarruf onerilerini
+  gosterir.
+- **Teknik Analiz:** Sunum ve hoca sorulari icin detay ekranidir. OCR kontrolu,
+  siniflandirma ozeti, uyelik fonksiyonlari, Mamdani kural aktivasyonlari,
+  agregasyon ve centroid grafikleri burada kalir.
 
 ## Bulanik Mantik Girdileri
 

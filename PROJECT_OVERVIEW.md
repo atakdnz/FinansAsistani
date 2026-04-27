@@ -111,6 +111,8 @@ Embedding modeli kategori aciklamalari ile islem aciklamasini vektor uzayinda ka
 Kullanici arayuzudur.
 
 - PDF yukleme alani vardir.
+- Varsayilan ekran sade `Oneri Paneli`dir; kullaniciya profil, portfoy, temel finans ozeti ve oneriler gosterilir.
+- `Teknik Analiz` sekmesi mevcut detayli demo ekranini korur; OCR kontrolu, siniflandirma ozeti, fuzzy grafikler ve kural aktivasyonlari burada gosterilir.
 - Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card vardir.
 - Yatirim vadesi risk toleransindan ayri fuzzy girdi olarak kullanilir.
 - Onerilen yatirim profili gosterilir.
@@ -217,6 +219,6 @@ Proje artik sunumdaki temel vaadi karsiliyor:
 - Yapay zeka destekli embedding katmani var.
 - Kullanici risk girdisi var.
 - Bulanik mantik var.
-- Dashboard var.
+- Kullanici icin sade Oneri Paneli ve sunum icin Teknik Analiz modu var.
 
 Kusursuz urun degil, ama ders projesi ve canli demo icin savunulabilir ve teknik olarak tutarli bir seviyede.

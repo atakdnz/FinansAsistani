@@ -60,6 +60,26 @@ header { margin-bottom: 36px; padding-bottom: 28px; border-bottom: 2px solid var
 .card-title::before { content: ''; width: 3px; height: 12px; border-radius: 2px; background: var(--accent); }
 .section-header { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin: 28px 0 12px; display: flex; align-items: center; gap: 8px; }
 .section-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.mode-tabs { display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+.mode-tab { border: 1px solid var(--border); border-bottom: none; background: var(--surface2); color: var(--text2); padding: 11px 16px; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 8px 8px 0 0; }
+.mode-tab.active { background: var(--surface); color: var(--accent); box-shadow: 0 -2px 0 var(--accent) inset; }
+.mode-panel { display: none; }
+.mode-panel.active { display: block; }
+.tech-only-flow { display: none; }
+.tech-only-flow.active { display: block; }
+.user-hero { background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--accent); padding: 28px; margin-bottom: 18px; display: grid; grid-template-columns: minmax(260px,1fr) minmax(260px,.75fr); gap: 24px; align-items: center; }
+.user-hero-title { font-family: 'Playfair Display',serif; font-size: clamp(26px,3vw,42px); font-weight: 700; line-height: 1.05; margin-bottom: 8px; }
+.user-hero-desc { color: var(--text2); max-width: 560px; }
+.user-hero-score { text-align: center; background: var(--bg); border: 1px solid var(--border); padding: 22px; }
+.user-score-label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); font-weight: 700; }
+.user-score-value { font-family: 'Playfair Display',serif; font-size: 54px; font-weight: 700; line-height: 1; margin: 6px 0; }
+.user-score-name { font-size: 22px; font-weight: 800; }
+.user-actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 14px; margin-bottom: 18px; }
+.user-action-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; border-left: 4px solid var(--accent); }
+.user-action-title { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+.user-action-text { color: var(--text2); font-size: 13px; }
+.user-section-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin: 22px 0 10px; }
+@media (max-width: 900px) { .user-hero { grid-template-columns: 1fr; } .mode-tabs { overflow-x: auto; } .mode-tab { white-space: nowrap; } }
 
 /* Buttons */
 .btn { background: var(--accent); color: white; border: none; padding: 12px 20px; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; border-radius: 4px; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter',sans-serif; }
@@ -251,9 +271,9 @@ canvas { max-width: 100%; }
     <p>PDF Ekstre → OCR Sınıflandırma → Bulanık Mantık → Portföy Önerisi</p>
   </div>
   <div class="header-tags">
-    <span class="tag filled">Bulanık Sistem</span>
-    <span class="tag">OCR + Embedding</span>
-    <span class="tag">Mamdani · Centroid</span>
+    <span class="tag filled">Kişisel Öneri</span>
+    <span class="tag">PDF Analizi</span>
+    <span class="tag">Teknik Mod Var</span>
   </div>
 </header>
 
@@ -285,7 +305,7 @@ canvas { max-width: 100%; }
 </div>
 
 <!-- Sistem İşleyişi: yatay akış -->
-<div style="margin-bottom:24px">
+<div class="tech-only-flow" style="margin-bottom:24px">
   <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
     <div class="status-dot" id="flowStatusDot"></div>
   </div>
@@ -590,6 +610,16 @@ const horizonLevels = [
 ];
 
 function bindControls(){
+  document.querySelectorAll('.mode-tab').forEach(tabBtn=>{
+    tabBtn.addEventListener('click', ()=>{
+      const target = tabBtn.dataset.modeTarget;
+      document.querySelectorAll('.mode-tab').forEach(btn=>btn.classList.toggle('active', btn===tabBtn));
+      document.querySelectorAll('.mode-panel').forEach(panel=>panel.classList.toggle('active', panel.id===target));
+      document.querySelectorAll('.tech-only-flow').forEach(flow=>flow.classList.toggle('active', target==='techMode'));
+      ['userPortoPie','userKatPie','userMonthlyChart','mf1','mf2','mf3','mf4','mf5','mf6','outChart','portoPie','katPie','monthlyChart']
+        .forEach(id=>Chart.getChart(id)?.resize());
+    });
+  });
   const riskBtn = document.getElementById('riskBtn');
   const saveBtn = document.getElementById('saveCorrectionsBtn');
   if(riskBtn) riskBtn.addEventListener('click', saveRiskProfile);
@@ -792,6 +822,19 @@ function ruleListHtml(rules, concClass){
   </div>${activeHtml}${inactiveHtml}`;
 }
 
+function userAdviceHtml(items){
+  const visible = (items || []).slice(0, 4);
+  if(!visible.length) return '<div class="stat-sub">PDF yüklendiğinde kişisel öneriler burada görünür.</div>';
+  return visible.map((item, i)=>{
+    const col = recColor(item.level);
+    return `<div class="user-action-card" style="border-left-color:${col}">
+      <div class="user-action-title" style="color:${col}">${escapeText(item.title)}</div>
+      <div class="user-action-text">${escapeText(item.detail)}</div>
+      <div class="stat-sub" style="margin-top:8px">${escapeText(item.category)} · ${fmt(item.amount||0)} TL · %${Number(item.percent||0).toFixed(1)}</div>
+    </div>`;
+  }).join('');
+}
+
 function render(d){
   const pc = profileColor(d.profil);
   const pct = Math.round(d.defuzz*100);
@@ -821,6 +864,115 @@ function render(d){
   };
 
   document.getElementById('contentArea').innerHTML = `
+  <div class="mode-tabs" role="tablist" aria-label="Görünüm seçimi">
+    <button class="mode-tab active" type="button" data-mode-target="userMode">Öneri Paneli</button>
+    <button class="mode-tab" type="button" data-mode-target="techMode">Teknik Analiz</button>
+  </div>
+
+  <section class="mode-panel active" id="userMode">
+    <div class="user-hero">
+      <div>
+        <div class="user-hero-title">Size uygun profil: <span style="color:${pc}">${d.profil}</span></div>
+        <div class="user-hero-desc">${descMap[d.profil]||porto.desc}</div>
+        <div class="c-wrap" style="max-width:520px">
+          <div class="c-label">Güvenli yatırım ile büyüme odaklı yatırım arasındaki konumunuz</div>
+          <div class="c-track">
+            <div class="c-fill" style="width:${pct}%"></div>
+            <div class="c-pointer" style="left:${pct}%"></div>
+          </div>
+          <div class="c-markers">
+            <span class="c-marker" style="color:var(--safe)">Güvenli</span>
+            <span class="c-marker" style="color:var(--balanced)">Dengeli</span>
+            <span class="c-marker" style="color:var(--bold)">Büyüme</span>
+          </div>
+        </div>
+      </div>
+      <div class="user-hero-score">
+        <div class="user-score-label">Profil Skoru</div>
+        <div class="user-score-value" style="color:${pc}">${d.defuzz.toFixed(2)}</div>
+        <div class="user-score-name" style="color:${pc}">${d.profil}</div>
+        <div class="stat-sub">PDF, harcama düzeni ve iki kullanıcı cevabı birlikte değerlendirilir.</div>
+      </div>
+    </div>
+
+    <div class="grid4">
+      <div class="card"><div class="card-title">Toplam Gelir</div>
+        <div class="stat-val cyan">${fmt(d.banka.toplam_gelir)}<span style="font-size:.85rem"> TL</span></div>
+        <div class="stat-sub">${d.banka.kaynak||'CSV'} kaynağından</div></div>
+      <div class="card"><div class="card-title">Toplam Gider</div>
+        <div class="stat-val" style="color:var(--bold)">${fmt(d.banka.toplam_gider)}<span style="font-size:.85rem"> TL</span></div>
+        <div class="stat-sub">${micro.adet?micro.adet+' küçük tahsilat analizden ayrıldı':'Analize dahil gider'}</div></div>
+      <div class="card"><div class="card-title">Aylık Ort. Tasarruf</div>
+        <div class="stat-val green">${fmt(d.banka.aylik_tasarruf_ort)}<span style="font-size:.85rem"> TL</span></div>
+        <div class="stat-sub">Gelir-gider farkı</div></div>
+      <div class="card"><div class="card-title">Kısılabilir Alan</div>
+        <div class="stat-val yellow">${fmt(d.banka.istege_bagli)}<span style="font-size:.85rem"> TL</span></div>
+        <div class="stat-sub">Tasarruf potansiyeli</div></div>
+    </div>
+
+    <div class="user-section-title">Yatırım Önerisi</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Önerilen Portföy</div>
+        <canvas id="userPortoPie"></canvas>
+        <div style="margin-top:12px">
+          ${portoItems.map(([n,p],i)=>`<div class="porto-item">
+            <div class="porto-dot" style="background:${COLORS[i]}"></div>
+            <div class="porto-name">${n}</div>
+            <div class="porto-bar-wrap"><div class="porto-bar-fill" style="width:${p}%;background:${COLORS[i]}"></div></div>
+            <div class="porto-pct" style="color:${COLORS[i]}">%${p}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Risk Tercihiniz</div>
+        <div class="risk-grid" style="grid-template-columns:1fr">
+          <div class="risk-input-card">
+            <div class="risk-input-title">Ne kadar kayıpla başa çıkabilirim?</div>
+            <div class="risk-input-control">
+              <div class="risk-label-badge" id="riskBadge"></div>
+              <input data-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance',d.inputs.risk)}">
+              <div class="risk-ticks"><span>Düşük</span><span>Orta</span><span>Yüksek</span></div>
+              <div class="risk-label-desc" id="riskDesc"></div>
+              <div class="slider-val" data-risk-value="risk_tolerance"></div>
+            </div>
+          </div>
+          <div class="risk-input-card">
+            <div class="risk-input-title">Paramı ne kadar süre bağlayabilirim?</div>
+            <div class="risk-input-control">
+              <div class="risk-label-badge" id="horizonBadge"></div>
+              <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon',d.inputs.vade)}">
+              <div class="risk-ticks"><span>Kısa</span><span>Orta</span><span>Uzun</span></div>
+              <div class="risk-label-desc" id="horizonDesc"></div>
+              <div class="slider-val" data-risk-value="investment_horizon"></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn" id="riskBtn" style="margin-top:12px;text-transform:none">Profilimi Güncelle</button>
+        <div class="status-text" id="riskStatus"></div>
+      </div>
+    </div>
+
+    <div class="user-section-title">Size Özel Tasarruf Önerileri</div>
+    <div class="user-actions">${userAdviceHtml(giderItems)}</div>
+    <div class="advice-summary">
+      <div class="advice-summary-title">Genel Değerlendirme</div>
+      <div class="advice-summary-text">${escapeText(giderAnalizi.summary||'Yeterli gider verisi bulunamadı.')}</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Harcama Dağılımı</div>
+        <canvas id="userKatPie"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title">Aylık Trend</div>
+        <canvas id="userMonthlyChart" height="120"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="mode-panel" id="techMode">
   <!-- 1. OCR İşlem Kontrolü + Sınıflandırma -->
   <div class="section-header">1 — OCR İşlem Kontrolü & Sınıflandırma</div>
   <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
@@ -962,27 +1114,26 @@ function render(d){
         <div class="risk-input-title">📉 Ne kadar kayıpla başa çıkabilirim?</div>
         <div class="risk-input-help">Yatırımınız geçici olarak değer kaybederse nasıl hissedersiniz? Kaydırıcıyı kendinize en uygun konuma getirin.</div>
         <div class="risk-input-control">
-          <div class="risk-label-badge" id="riskBadge"></div>
-          <input data-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance',d.inputs.risk)}">
+          <div class="risk-label-badge" id="techRiskBadge">${riskLevels.find(l=>d.inputs.risk<l.max)?.emoji || ''} ${riskLevels.find(l=>d.inputs.risk<l.max)?.label || ''}</div>
+          <input data-tech-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance',d.inputs.risk)}" disabled>
           <div class="risk-ticks"><span>Hiç kayıp istemem</span><span>Orta</span><span>Yüksek risk, yüksek getiri</span></div>
-          <div class="risk-label-desc" id="riskDesc"></div>
-          <div class="slider-val" data-risk-value="risk_tolerance"></div>
+          <div class="risk-label-desc" id="techRiskDesc">Kullanıcı panelindeki cevap teknik hesaba yansıtılır.</div>
+          <div class="slider-val" data-tech-risk-value="risk_tolerance"></div>
         </div>
       </div>
       <div class="risk-input-card">
         <div class="risk-input-title">⏳ Paramı ne kadar süre bağlayabilirim?</div>
         <div class="risk-input-help">Bu parayı ne zaman kullanmanız gerekebilir? Süre ne kadar uzunsa sisteme o kadar esneklik tanırsınız.</div>
         <div class="risk-input-control">
-          <div class="risk-label-badge" id="horizonBadge"></div>
-          <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon',d.inputs.vade)}">
+          <div class="risk-label-badge" id="techHorizonBadge">${horizonLevels.find(l=>d.inputs.vade<l.max)?.emoji || ''} ${horizonLevels.find(l=>d.inputs.vade<l.max)?.label || ''}</div>
+          <input data-tech-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon',d.inputs.vade)}" disabled>
           <div class="risk-ticks"><span>Yakında lazım</span><span>Birkaç yıl</span><span>10+ yıl</span></div>
-          <div class="risk-label-desc" id="horizonDesc"></div>
-          <div class="slider-val" data-risk-value="investment_horizon"></div>
+          <div class="risk-label-desc" id="techHorizonDesc">Yatırım ufku teknik ekranda okunur, kullanıcı panelinden güncellenir.</div>
+          <div class="slider-val" data-tech-risk-value="investment_horizon"></div>
         </div>
       </div>
     </div>
-    <button class="btn" id="riskBtn" style="margin-top:16px;font-family:'Playfair Display',serif;font-size:15px;font-weight:700;letter-spacing:.02em;text-transform:none;">Profilimi Hesapla & Kaydet</button>
-    <div class="status-text" id="riskStatus"></div>
+    <div class="status-text">Bu bölüm açıklama amaçlıdır. Risk cevapları Öneri Paneli'nden güncellenir.</div>
   </div>
 
   <!-- Fuzzy Sonuç -->
@@ -1106,6 +1257,8 @@ function render(d){
     </div>
   </div>
 
+  </section>
+
   <div class="disclaimer">Bu sistem eğitim/prototip amaçlıdır. Gerçek yatırım tavsiyesi değildir.</div>
   `;
 
@@ -1114,6 +1267,9 @@ function render(d){
   window._simTotalGider = d.banka.toplam_gider || 0;
 
   // Chartları çiz
+  renderPortoPie('userPortoPie', porto.items);
+  renderKatPie('userKatPie', d.banka.kategoriler);
+  renderMonthly('userMonthlyChart', d.banka.monthly);
   mfKeys.forEach(([key,,cid])=>renderMFChart(cid, d.mf_charts[key], d.mf_charts[key].value));
   renderOutputChart('outChart', d.output_chart);
   renderPortoPie('portoPie', porto.items);
