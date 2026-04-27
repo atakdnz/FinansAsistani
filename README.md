@@ -32,6 +32,11 @@ Turkce karakterler sade forma indirilir, noktalama ve fazla bosluklar
 temizlenir. Bu sayede `YEMEKPAY`, `GETIR`, `BSMV`, `KOMISYON` gibi sinyaller
 daha kararli yakalanir.
 
+Turkce metinler icin PaddleOCR tarafinda `latin_PP-OCRv5_mobile_rec`
+recognition modeli kullanilir. Bu model Latin alfabeli diller arasinda
+Turkce'yi de destekler ve `ÖĞRENİM`, `ALIŞVERİŞ`, `İŞYERİ` gibi kelimelerde
+Ingilizce modele gore daha kararli sonuc verir.
+
 ## Calistirma
 
 PaddleOCR cache'i proje icinde tutulur:

@@ -121,7 +121,7 @@ def create_ocr():
         use_doc_unwarping=False,
         use_textline_orientation=False,
         text_detection_model_name="PP-OCRv5_mobile_det",
-        text_recognition_model_name="en_PP-OCRv5_mobile_rec",
+        text_recognition_model_name="latin_PP-OCRv5_mobile_rec",
         text_det_limit_side_len=1600,
         text_det_limit_type="max",
     )

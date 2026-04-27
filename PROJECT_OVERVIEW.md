@@ -49,6 +49,8 @@ Normalizasyon, siniflandirmadan once metni ortak ve daha kararli bir forma cekme
 
 Bu sayede kural tabani bozuk OCR ciktilarinda bile `GETIR`, `YEMEKPAY`, `BSMV`, `KOMISYON`, `KK OTOMATIK ODEME` gibi sinyalleri yakalayabilir.
 
+PaddleOCR'da recognition modeli olarak `latin_PP-OCRv5_mobile_rec` kullaniliyor. Bu model Latin alfabeli diller icin egitildigi ve Turkce'yi destekledigi icin `en_PP-OCRv5_mobile_rec` modeline gore daha dogru sonuc verdi. Test PDF'inde `ÖĞRENİM`, `KREDİ`, `ALIŞVERİŞ`, `İŞYERİ` gibi kelimeler Latin modelle daha duzgun okundu.
+
 ## Dosya Dosya Kod Rehberi
 
 ### `app.py`
