@@ -40,6 +40,11 @@ Risk toleransi kullanicidan tek slider olarak alinir. Yatirim vadesi ayri girdi
 olarak tutulur; uzun vade tek basina agresif profil uretmez, sadece risk
 toleransi ve finansal tampon uygunsa daha dalgali portfoylere alan acar.
 
+Kural tabani 25 Mamdani kuralindan olusur. Arayuzde yalnizca aktif kurallar
+varsayilan olarak gosterilir; 0 aktivasyonlu pasif kurallar acilip kapanabilen
+ayri bir bolumde tutulur. Mamdani min operatorunde bir kosulun uyeligi 0 ise
+ilgili kuralin 0 gorunmesi normaldir.
+
 ## Mikro Islemler ve Oneriler
 
 10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar
@@ -98,6 +103,7 @@ Asagidaki dosyalar yerel calisma urunudur ve commitlenmez:
 - `uploads/`
 - `extracted_transactions.csv`
 - `user_profile.json`
+- `last_pdf_name.txt`
 - `.venv_*`
 - `.paddlex_cache/`
 - gercek hesap dokumu PDF dosyalari

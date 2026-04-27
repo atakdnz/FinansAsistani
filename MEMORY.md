@@ -51,24 +51,30 @@ Bu ortamdaki sandbox nedeniyle `.git` yazan git komutlari cogunlukla escalated c
 
 ## Mevcut Commit Gecmisi
 
-- `b8f22dc Initialize finance assistant project`
-- `bd369a5 Add rule-based transaction classification`
-- `96ced67 Add PDF upload and risk profile flow`
-- `6f508ce Document OCR finance assistant flow`
-- `2b23bc7 Use Latin PaddleOCR recognition for Turkish statements`
-- `2324b00 Add OCR correction workflow docs`
-- `c08bc51 Document optional fuzzy inputs`
+Son onemli commitler:
 
-Bu MEMORY dosyasi sonradan 6 girdili fuzzy sisteme gore guncellendi. Bu oturumdaki yeni degisiklikler commitlenirken listeye yeni commit SHA'si eklenmelidir.
+- `dea4881 Clarify fuzzy rule activation display`
+- `bec1bc4 Refine fuzzy rule base`
+- `62fc953 Merge teammate dashboard updates`
+- `3fa119d Simplify risk profile inputs`
+- `fb9976d Stabilize OCR parsing and fuzzy inputs`
+- `4e40cbe Refine category expense guidance`
+- `f2779e6 Add micro transaction filtering and recommendations`
+- `d15d1c9 Expand fuzzy profile inputs`
+- `c08bc51 Document optional fuzzy inputs`
+- `2324b00 Add OCR correction workflow docs`
+- `2b23bc7 Use Latin PaddleOCR recognition for Turkish statements`
+- `6f508ce Document OCR finance assistant flow`
 
 Yeni 6 girdili fuzzy degisiklikleri:
 
 - Yatirim vadesi risk toleransi ortalamasindan ayrildi.
 - Acil durum tamponu hesap dokumundeki bakiye ve zorunlu giderden hesaplandi.
 - Borc yuku orani kredi/kart/borc odemeleri uzerinden hesaplandi.
-- Kural tabani 17 hedefli Mamdani kuralina cikti.
+- Kural tabani 25 hedefli Mamdani kuralina cikti.
 - 10 TL ve altindaki mikro tahsilatlar analiz ve arayuz listesinden ayrildi.
 - Kategori bazli oneri kartlari eklendi.
+- Pasif fuzzy kurallari arayuzde katlanabilir bolume tasindi.
 
 ## Calisma Ortami
 
@@ -192,7 +198,9 @@ Fuzzy sistem su anda 6 girdi kullanir:
 - `tampon`: son bakiye / aylik ortalama zorunlu gider uzerinden acil durum tamponu.
 - `borc`: borc/kredi/kart odemeleri / toplam gelir.
 
-Kural tabani su anda 17 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
+Kural tabani su anda 25 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
+
+Arayuzde kural listesi aktif kurallari varsayilan olarak gosterir. 0 aktivasyonlu pasif kurallar `pasif kural` adli katlanabilir bolumdedir. Pasif kural sayisinin yuksek olmasi normaldir; Mamdani min operatorunde bir kosulun uyeligi 0 ise kural aktivasyonu da 0 olur.
 
 10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar ham CSV'de kalir, ama dashboard islem tablosunda gosterilmez ve toplam gider, kategori dagilimi, aylik trend, fuzzy girdi hesaplari ve kategori analizini etkilemez.
 
@@ -293,7 +301,7 @@ Bu iki metrik su an dashboard/gelecek oneri motoru icin anlamli adaylardir; ana 
 
 Zorunlu olmayan ama projeyi guclendirecek alanlar:
 
-1. Kategori bazli onerilerin metinlerini ve esiklerini daha fazla ornekle iyilestirmek.
+1. Kategori bazli onerilerin metinlerini ve esiklerini daha fazla gercek dokumle iyilestirmek.
 2. OCR duzeltme ekraninda dusuk guvenli satirlari vurgulamak.
 3. Fuzzy kural agirliklarini daha fazla senaryoyla ince ayar yapmak.
 4. Fuzzy hesaplamayi `app.py` icinden ayri bir servis modulune tasimak.
@@ -400,4 +408,4 @@ En mantikli sonraki teknik adim:
 - `/api/transactions` POST duzeltmeleri `manual`, `user_correction`, `1.0` guvenle yazar.
 - Gercek hesap dokumu ve uretilen CSV'ler commitlenmemeli.
 - PaddleOCR cache `.paddlex_cache` icinde kalmali ve commitlenmemeli.
-- Browser UI son hali henuz tam gorsel testten gecmemis olabilir. Calisan server varsa `http://127.0.0.1:5050/` uzerinden test etmek iyi olur.
+- Son tarayici kontrolunde kural aktivasyon ozeti, kapali pasif kural bolumu ve konsol hatasiz dashboard dogrulandi.

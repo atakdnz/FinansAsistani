@@ -141,9 +141,10 @@ Yapildi:
 - Risk toleransi fuzzy sisteme baglandi.
 - Yatirim vadesi risk toleransi ortalamasindan ayrilip bagimsiz fuzzy girdi yapildi.
 - Acil durum tamponu ve borc yuku hesap dokumunden hesaplanip fuzzy sisteme eklendi.
-- Fuzzy kural tabani 6 girdi kullanan 17 hedefli Mamdani kuralina genisletildi.
+- Fuzzy kural tabani 6 girdi kullanan 25 hedefli Mamdani kuralina genisletildi.
 - 10 TL ve altindaki mikro islemler analiz ve arayuz listesinden ayrildi.
 - Kategori bazli oneri kartlari eklendi.
+- Pasif fuzzy kurallari arayuzde katlanabilir bolume tasindi; aktif kurallar varsayilan olarak ustte gosteriliyor.
 - Sentetik CSV'ye bagimlilik azaltildi.
 - Deterministik siniflandirma sistemi eklendi.
 - Embedding destekli yardimci siniflandirma eklendi.
@@ -154,14 +155,13 @@ Yapildi:
 
 Kismen yapildi:
 
-- Gider analizi kategori toplamlarini ve tasarruf potansiyelini gosteriyor, ama kategori bazli detayli oneri metinleri henuz sinirli.
+- Gider analizi kategori toplamlarini, tasarruf potansiyelini ve kategoriye ozel aksiyon metinlerini gosteriyor. Metin/esik kalitesi daha fazla gercek dokumle ince ayar gerektirebilir.
 - Embedding fallback var, fakat mevcut gercek PDF orneginde deterministik kurallar tum satirlari yuksek guvenle yakaladigi icin embedding devreye girmedi.
 - Gelir duzenliligi gercek PDF tek aylik veri oldugunda notr varsayiliyor (`0.65`). Daha fazla aylik PDF yuklenirse daha anlamli hesaplanabilir.
 
 Henuz yapilmadi:
 
 - PDF parser farkli banka formatlarina karsi kapsamli test edilmedi.
-- Kategori bazli oneri motoru var, ama metinler ve esikler daha fazla ornekle iyilestirilebilir.
 - Fuzzy mantik kodu ayri bir servis modulune tasinmadi.
 
 ## Sunumda Nasil Anlatilir?
@@ -172,13 +172,13 @@ Kisa teknik cumle:
 
 ## Mantikli Sonraki Gelistirmeler
 
-1. **Kural sayisini artirmak**
+1. **Siniflandirma kural listesini genisletmek**
 
    Daha fazla merchant ve banka terimi eklenebilir. Ozellikle saglik, egitim, abonelik, market, e-ticaret, ulasim ve fatura kaliplari genisletilebilir.
 
 2. **Gider oneri motorunu iyilestirmek**
 
-   Kategori toplamlarina gore kisa oneriler uretiliyor. Ileride su ayrimlar daha detayli hale getirilebilir:
+   Kategori toplamlarina gore oneriler uretiliyor. Ileride su ayrimlar daha detayli hale getirilebilir:
 
    - Gida harcamasi yuksekse market/yemek disi ayrimi yapilabilir.
    - Ulasim yuksekse yakit/toplu tasima ayrimi yapilabilir.
@@ -188,9 +188,9 @@ Kisa teknik cumle:
 
    Mevcut ekran islem satirlarini duzenleyebiliyor. Bir sonraki adimda dusuk guvenli satirlari daha belirgin gostermek, ham OCR satirini tooltip veya detay satiri olarak acmak ve kayit sonrasi daha net geri bildirim vermek iyi olur.
 
-4. **Fuzzy kural tabanini genisletmek**
+4. **Fuzzy kural agirliklarini ince ayar yapmak**
 
-   Su an 6 girdiyi kullanan 17 hedefli kural var. Ileride kural agirliklari daha fazla ornek senaryoyla test edilip ince ayar yapilabilir.
+   Su an 6 girdiyi kullanan 25 hedefli kural var. Kurallar sunum icin yeterli seviyede; daha fazla ornek senaryoyla aktivasyon esikleri ve portfoy sonuc davranisi ince ayar yapilabilir.
 
 5. **Portfoy dagilimini daha aciklanabilir yapmak**
 
