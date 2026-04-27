@@ -133,6 +133,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 /* Rules */
 .rule-list { display: flex; flex-direction: column; gap: 4px; }
 .rule-row { display: grid; grid-template-columns: 50px 1fr 80px 100px; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); }
+.rule-row.inactive { opacity: .42; }
+.rule-row.inactive .rule-bar-fill { background: var(--border-dark); }
 .rule-str { font-size: 11px; font-weight: 600; color: var(--accent); }
 .rule-desc { font-size: 11px; color: var(--text2); }
 .rule-bar-wrap { height: 4px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
@@ -141,6 +143,14 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 .rule-tag.safe { background: var(--safe-bg); color: var(--safe); }
 .rule-tag.balanced { background: var(--balanced-bg); color: var(--balanced); }
 .rule-tag.bold { background: var(--bold-bg); color: var(--bold); }
+.rule-summary { font-size: 11px; color: var(--text2); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 10px 12px; margin-bottom: 10px; }
+.rule-summary strong { color: var(--accent); }
+.inactive-rules { margin-top: 8px; }
+.inactive-rules summary { cursor: pointer; list-style: none; border: 1px solid var(--border); background: var(--surface); padding: 9px 12px; font-size: 11px; font-weight: 700; color: var(--accent); }
+.inactive-rules summary::-webkit-details-marker { display: none; }
+.inactive-rules summary::after { content: 'Göster'; float: right; color: var(--text3); font-weight: 600; }
+.inactive-rules[open] summary::after { content: 'Gizle'; }
+.inactive-rules-body { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 
 /* Category & Expense */
 .kat-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
@@ -470,12 +480,7 @@ function updateFuzzyResult(d){
   const ruleList = document.querySelector('.rule-list');
   if(ruleList){
     const concClass = {'Güvenilir':'safe','Dengeli':'balanced','Agresif':'bold'};
-    ruleList.innerHTML = d.rules.map(r=>`<div class="rule-row">
-      <div class="rule-str">${r.activation.toFixed(3)}</div>
-      <div class="rule-desc">${r.condition}</div>
-      <div class="rule-bar-wrap"><div class="rule-bar-fill" style="width:${(r.activation*100).toFixed(1)}%"></div></div>
-      <div class="rule-tag ${concClass[r.conclusion]||''}">${r.conclusion}</div>
-    </div>`).join('');
+    ruleList.innerHTML = ruleListHtml(d.rules, concClass);
     const ruleTitle = ruleList.closest('.card')?.querySelector('.card-title');
     if(ruleTitle) ruleTitle.textContent = d.rules.length+' Kural — Aktivasyon';
   }
@@ -763,6 +768,30 @@ function renderPortoPie(canvasId, items){
   });
 }
 
+function ruleListHtml(rules, concClass){
+  const activeRules = rules.filter(r=>r.active);
+  const inactiveRules = rules.filter(r=>!r.active);
+  const activeCount = activeRules.length;
+  const strongest = activeRules[0];
+  const strongestText = strongest
+    ? ` En güçlü kural: ${strongest.id} (${strongest.activation.toFixed(3)}).`
+    : ' Bu veriyle anlamlı seviyede ateşlenen kural yok.';
+  const rowHtml = (r, inactive=false)=>`<div class="rule-row ${inactive?'inactive':''}">
+    <div class="rule-str">${r.activation.toFixed(3)}</div>
+    <div class="rule-desc">${r.condition}</div>
+    <div class="rule-bar-wrap"><div class="rule-bar-fill" style="width:${(r.activation*100).toFixed(1)}%"></div></div>
+    <div class="rule-tag ${concClass[r.conclusion]||''}">${r.conclusion}</div>
+  </div>`;
+  const activeHtml = activeRules.map(r=>rowHtml(r)).join('') || '<div class="stat-sub">Bu veriyle aktif kural oluşmadı.</div>';
+  const inactiveHtml = inactiveRules.length ? `<details class="inactive-rules">
+    <summary>${inactiveRules.length} pasif kural</summary>
+    <div class="inactive-rules-body">${inactiveRules.map(r=>rowHtml(r, true)).join('')}</div>
+  </details>` : '';
+  return `<div class="rule-summary">
+    <strong>${activeCount}/${rules.length}</strong> kural aktif. Pasif kuralların 0 görünmesi normaldir; Mamdani min operatöründe bir koşulun üyeliği 0 ise kural da 0 olur.${strongestText}
+  </div>${activeHtml}${inactiveHtml}`;
+}
+
 function render(d){
   const pc = profileColor(d.profil);
   const pct = Math.round(d.defuzz*100);
@@ -1036,12 +1065,7 @@ function render(d){
   <div class="grid2">
     <div class="card"><div class="card-title">${d.rules.length} Kural — Aktivasyon</div>
       <div class="rule-list">
-      ${d.rules.map(r=>`<div class="rule-row">
-        <div class="rule-str">${r.activation.toFixed(3)}</div>
-        <div class="rule-desc">${r.condition}</div>
-        <div class="rule-bar-wrap"><div class="rule-bar-fill" style="width:${(r.activation*100).toFixed(1)}%"></div></div>
-        <div class="rule-tag ${concClass[r.conclusion]}">${r.conclusion}</div>
-      </div>`).join('')}
+      ${ruleListHtml(d.rules, concClass)}
       </div>
     </div>
     <div class="card"><div class="card-title">Agregasyon & Centroid</div>
