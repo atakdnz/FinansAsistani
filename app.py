@@ -187,85 +187,175 @@ def calculate_financial_metrics(banka):
         "aylik_tasarruf": aylik_tasarruf,
     }
 
-def build_category_recommendations(metrics, kat_gider):
-    recommendations = []
+def _category_level(category, share):
+    high_thresholds = {
+        "Konut/Fatura": 0.35,
+        "Gıda": 0.18,
+        "Ulaştırma": 0.12,
+        "Alışveriş": 0.15,
+        "İsteğe Bağlı": 0.12,
+        "Borç/Kredi/Kart": 0.25,
+        "Banka Ücreti": 0.03,
+        "Diğer": 0.15,
+        "Gelir": 0.01,
+    }
+    medium_thresholds = {
+        "Konut/Fatura": 0.25,
+        "Gıda": 0.10,
+        "Ulaştırma": 0.06,
+        "Alışveriş": 0.08,
+        "İsteğe Bağlı": 0.06,
+        "Borç/Kredi/Kart": 0.12,
+        "Banka Ücreti": 0.01,
+        "Diğer": 0.08,
+        "Gelir": 0.001,
+    }
+    if share >= high_thresholds.get(category, 0.18):
+        return "high"
+    if share >= medium_thresholds.get(category, 0.08):
+        return "medium"
+    return "low"
+
+def _category_advice(category, share, amount, metrics):
+    level = _category_level(category, share)
+    percent = round(share * 100)
+    target_saving = 0.0
+
+    if category == "Gıda":
+        target_saving = amount * (0.15 if level == "high" else 0.10 if level == "medium" else 0.0)
+        detail = "Market, paket yemek ve kahve harcamaları liste yapılarak takip edilmeli."
+        if target_saving:
+            detail += f" Bu kategoride yaklaşık {target_saving:.0f} TL tasarruf hedeflenebilir."
+        potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
+        return "Gıda Bütçesi", potential, detail, "saving" if level != "low" else "info", target_saving
+
+    if category == "Ulaştırma":
+        target_saving = amount * (0.15 if level == "high" else 0.10 if level == "medium" else 0.0)
+        detail = "Yakıt, taksi ve ulaşım sıklığı planlanarak toplu taşıma veya paylaşım seçenekleri denenebilir."
+        if target_saving:
+            detail += f" Hedef kesinti yaklaşık {target_saving:.0f} TL olabilir."
+        potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
+        return "Ulaştırma Tasarrufları", potential, detail, "saving" if level != "low" else "info", target_saving
+
+    if category == "Konut/Fatura":
+        detail = "Kira, abonelik ve fatura kalemleri zorunlu tarafta kaldığı için kısa vadede kesinti alanı sınırlı."
+        if level == "high":
+            detail += " Toplam gider içindeki pay yüksek; tarife ve abonelik kontrolü uzun vadeli rahatlama sağlayabilir."
+        return "Konut ve Fatura Yönetimi", "Düşük tasarruf potansiyeli", detail, "warning" if level == "high" else "info", 0.0
+
+    if category == "Sağlık":
+        return (
+            "Sağlık Harcamaları",
+            "Zorunlu gider",
+            "Bu kalem azaltma hedefi olarak değil, acil durum tamponu ve sigorta planı içinde izlenmeli.",
+            "info",
+            0.0,
+        )
+
+    if category == "Eğitim":
+        target_saving = amount * (0.08 if level == "high" else 0.0)
+        detail = "Eğitim harcaması gelişim yatırımı olarak korunabilir; tekrar eden abonelik veya kurs ücretleri karşılaştırılmalı."
+        if target_saving:
+            detail += f" Gereksiz tekrarlar temizlenirse yaklaşık {target_saving:.0f} TL alan açılabilir."
+        return "Eğitim Planı", "Düşük-Orta tasarruf potansiyeli", detail, "info", target_saving
+
+    if category == "Alışveriş":
+        target_saving = amount * (0.20 if level == "high" else 0.12 if level == "medium" else 0.0)
+        detail = "Zorunlu olmayan alışverişlerde bekleme listesi ve aylık limit kullanılabilir."
+        if target_saving:
+            detail += f" Bu kalemde yaklaşık {target_saving:.0f} TL yatırım bütçesine ayrılabilir."
+        potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
+        return "Alışveriş Kontrolü", potential, detail, "saving" if level != "low" else "info", target_saving
+
+    if category == "İsteğe Bağlı":
+        target_saving = amount * (0.20 if level == "high" else 0.12 if level == "medium" else 0.0)
+        detail = "Eğlence, dijital abonelik ve keyfi harcamalar aylık kota ile sınırlandırılabilir."
+        if target_saving:
+            detail += f" Hedef tasarruf yaklaşık {target_saving:.0f} TL."
+        potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
+        return "İsteğe Bağlı Harcamalar", potential, detail, "saving" if level != "low" else "info", target_saving
+
+    if category == "Borç/Kredi/Kart":
+        detail = "Kart ve kredi ödemeleri yatırım kararından önce nakit akışında öncelikli izlenmeli."
+        if metrics["borc_yuku"] >= 0.30:
+            detail += " Borç yükü yüksek olduğu için agresif profil yerine borç azaltma daha savunulabilir."
+        return "Borç ve Kart Ödemeleri", "Öncelikli takip", detail, "warning" if level != "low" else "info", 0.0
+
+    if category == "Banka Ücreti":
+        target_saving = amount * (0.50 if level == "high" else 0.25 if level == "medium" else 0.0)
+        detail = "Komisyon, FAST/EFT ve hesap paketi ücretleri banka kanalı veya paket seçimiyle düşürülebilir."
+        if target_saving:
+            detail += f" Tahmini azaltılabilir tutar {target_saving:.0f} TL civarında."
+        return "Banka Ücretleri", "Düşük-Orta tasarruf potansiyeli", detail, "saving" if level != "low" else "info", target_saving
+
+    if category == "Gelir":
+        return (
+            "Gelir Kategorisi Kontrolü",
+            "Sınıflandırma kontrolü",
+            "Negatif tutarlı bazı kayıtlar gelir kategorisine düşmüş. OCR kontrol ekranında bu satırlar düzeltilirse analiz daha güvenilir olur.",
+            "warning",
+            0.0,
+        )
+
+    detail = "Bu kategori işlem açıklaması belirsiz kalan kalemlerden oluşuyor. OCR kontrol ekranında düzeltilirse öneriler kişiselleşir."
+    if percent >= 10:
+        detail += " Payı yüksek olduğu için önce buradaki büyük işlemler incelenmeli."
+    return "Diğer Giderler", "Sınıflandırma kontrolü", detail, "warning" if level != "low" else "info", 0.0
+
+def build_category_analysis(metrics, kat_gider):
     toplam_gider = float(metrics["toplam_gider"])
-    toplam_gelir = float(metrics["toplam_gelir"])
+    giderler = metrics["giderler"]
+    type_totals = giderler.groupby("Gider Tipi")["Abs"].sum() if not giderler.empty else pd.Series(dtype=float)
+    items = []
+    total_target_saving = 0.0
 
+    for category, amount in kat_gider.head(8).items():
+        amount = float(amount)
+        share = amount / toplam_gider if toplam_gider > 0 else 0.0
+        title, potential, detail, level, target_saving = _category_advice(category, share, amount, metrics)
+        total_target_saving += float(target_saving)
+        items.append({
+            "category": str(category),
+            "title": title,
+            "amount": round(amount, 2),
+            "percent": round(share * 100, 1),
+            "level": level,
+            "potential": potential,
+            "detail": detail,
+            "target_saving": round(float(target_saving), 2),
+        })
+
+    zorunlu = float(type_totals.get("Zorunlu", 0.0))
+    kisilabilir = float(type_totals.get("Kısılabilir", 0.0))
+    istege_bagli = float(type_totals.get("İsteğe Bağlı", 0.0))
+    belirsiz = float(type_totals.get("Belirsiz", 0.0))
+    pct = lambda value: round((value / toplam_gider * 100) if toplam_gider > 0 else 0.0)
+
+    summary_parts = [
+        f"Giderlerin %{pct(zorunlu)}'i zorunlu",
+        f"%{pct(kisilabilir)}'i kısılabilir",
+        f"%{pct(istege_bagli)}'i isteğe bağlı",
+    ]
+    if belirsiz:
+        summary_parts.append(f"%{pct(belirsiz)}'i sınıflandırma kontrolü istiyor")
+    summary = ", ".join(summary_parts) + "."
+    if total_target_saving > 0:
+        summary += f" Kategori hedefleri uygulanırsa yaklaşık {total_target_saving:.0f} TL yatırım bütçesi açılabilir."
     if metrics["mikro_adedi"]:
-        recommendations.append({
-            "title": "Mikro işlemler analiz dışı",
-            "detail": f"{MICRO_TRANSACTION_LIMIT:.0f} TL ve altındaki {metrics['mikro_adedi']} küçük tahsilat toplamları ve grafikleri etkilemiyor.",
-            "level": "info",
-        })
+        summary += f" {MICRO_TRANSACTION_LIMIT:.0f} TL ve altındaki mikro tahsilatlar bu analize dahil edilmedi."
 
-    if metrics["borc_yuku"] >= 0.30:
-        recommendations.append({
-            "title": "Borç yükü yüksek",
-            "detail": "Kredi veya kart ödemeleri gelirin önemli bölümünü kullanıyor; agresif yatırım yerine borç yükünü azaltmak öncelikli olabilir.",
-            "level": "warning",
-        })
-    elif metrics["borc_yuku"] >= 0.15:
-        recommendations.append({
-            "title": "Borç yükü izlenmeli",
-            "detail": "Borç/kredi/kart ödemeleri orta seviyede. Düzenli ödeme korunursa dengeli portföy daha savunulabilir olur.",
-            "level": "info",
-        })
-
-    gida = float(kat_gider.get("Gıda", 0.0)) if not kat_gider.empty else 0.0
-    if toplam_gider > 0 and gida / toplam_gider >= 0.25:
-        recommendations.append({
-            "title": "Gıda harcaması öne çıkıyor",
-            "detail": "Paket yemek, kahve ve dışarıda yemek kalemleri azaltılabilir harcama olarak izlenebilir.",
-            "level": "saving",
-        })
-
-    istege_bagli = float(kat_gider.get("İsteğe Bağlı", 0.0)) if not kat_gider.empty else 0.0
-    alisveris = float(kat_gider.get("Alışveriş", 0.0)) if not kat_gider.empty else 0.0
-    esnek_tutar = float(metrics["esnek_gider"])
-    if toplam_gider > 0 and (esnek_tutar + istege_bagli + alisveris) / toplam_gider >= 0.30:
-        recommendations.append({
-            "title": "Tasarruf alanı var",
-            "detail": "Kısılabilir ve isteğe bağlı harcamalar yüksek. Bu kalemlerde küçük kesintiler yatırım bütçesini artırabilir.",
-            "level": "saving",
-        })
-
-    banka_ucreti = float(kat_gider.get("Banka Ücreti", 0.0)) if not kat_gider.empty else 0.0
-    if banka_ucreti >= 50:
-        recommendations.append({
-            "title": "Banka ücretleri kontrol edilmeli",
-            "detail": "Komisyon ve işlem ücretleri belirginleşmiş. EFT/FAST limitleri veya hesap paketi kontrol edilebilir.",
-            "level": "info",
-        })
-
-    if metrics["tampon_ay"] is not None:
-        if metrics["tampon_ay"] < 1:
-            recommendations.append({
-                "title": "Acil durum tamponu zayıf",
-                "detail": "Zorunlu giderleri karşılayacak nakit tampon düşük. Yatırımdan önce kısa vadeli nakit rezervi güçlendirilebilir.",
-                "level": "warning",
-            })
-        elif metrics["tampon_ay"] >= 3:
-            recommendations.append({
-                "title": "Acil durum tamponu güçlü",
-                "detail": "Mevcut bakiye zorunlu giderlere göre güçlü görünüyor; risk ve vade uygunsa yatırım alanı oluşuyor.",
-                "level": "positive",
-            })
-
-    if toplam_gelir > 0 and metrics["tasarruf_orani"] >= 0.20:
-        recommendations.append({
-            "title": "Tasarruf oranı sağlıklı",
-            "detail": "Gelire göre net birikim pozitif. Bu düzen korunursa portföy önerisi daha sürdürülebilir olur.",
-            "level": "positive",
-        })
-
-    if not recommendations:
-        recommendations.append({
-            "title": "Belirgin risk sinyali yok",
-            "detail": "Bu dökümde kategori bazlı büyük bir sapma görünmüyor. Daha fazla aylık veriyle öneriler keskinleşir.",
-            "level": "info",
-        })
-    return recommendations[:5]
+    return {
+        "toplam_gider": round(toplam_gider, 2),
+        "items": items,
+        "summary": summary,
+        "target_saving": round(total_target_saving, 2),
+        "type_breakdown": {
+            "zorunlu": round(zorunlu, 2),
+            "kisilabilir": round(kisilabilir, 2),
+            "istege_bagli": round(istege_bagli, 2),
+            "belirsiz": round(belirsiz, 2),
+        },
+    }
 
 def compute_fuzzy_inputs(banka, fallback_ozet):
     metrics = calculate_financial_metrics(banka)
@@ -353,7 +443,8 @@ def run_fuzzy():
     aylik_tasarruf = metrics["aylik_tasarruf"]
 
     kat_gider = giderler.groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
-    recommendations = build_category_recommendations(metrics, kat_gider)
+    gider_analizi = build_category_analysis(metrics, kat_gider)
+    recommendations = gider_analizi["items"]
     dusuk_guven = analiz_banka[analiz_banka["Sınıflandırma Güveni"] < 0.50].copy()
 
     # Aylık trend için ay bazında gelir/gider
@@ -565,6 +656,7 @@ def run_fuzzy():
             "tasarruf_orani": round(float(metrics["tasarruf_orani"]),4),
             "kisilabilir_oran": round(float(metrics["kisilabilir_oran"]),4),
             "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
+            "gider_analizi": gider_analizi,
             "oneriler": recommendations,
             "mikro_islem": {
                 "esik": MICRO_TRANSACTION_LIMIT,

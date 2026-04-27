@@ -199,6 +199,55 @@ class TransactionClassifierTests(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_category_analysis_builds_specific_advice(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "Tarih": pd.Timestamp("2026-04-01"),
+                    "Tutar": 10000.0,
+                    "Kategori": "Gelir",
+                    "Gider Tipi": "Gelir",
+                    "Bakiye": 15000.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+                {
+                    "Tarih": pd.Timestamp("2026-04-02"),
+                    "Tutar": -1800.0,
+                    "Kategori": "Gıda",
+                    "Gider Tipi": "Kısılabilir",
+                    "Bakiye": 13200.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+                {
+                    "Tarih": pd.Timestamp("2026-04-03"),
+                    "Tutar": -900.0,
+                    "Kategori": "Ulaştırma",
+                    "Gider Tipi": "Kısılabilir",
+                    "Bakiye": 12300.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+                {
+                    "Tarih": pd.Timestamp("2026-04-04"),
+                    "Tutar": -4.0,
+                    "Kategori": "Banka Ücreti",
+                    "Gider Tipi": "Zorunlu",
+                    "Bakiye": 12296.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+            ]
+        )
+
+        metrics = finance_app.calculate_financial_metrics(df)
+        kat_gider = metrics["giderler"].groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
+        analysis = finance_app.build_category_analysis(metrics, kat_gider)
+        food_item = next(item for item in analysis["items"] if item["category"] == "Gıda")
+
+        self.assertEqual(food_item["title"], "Gıda Bütçesi")
+        self.assertGreater(food_item["percent"], 60)
+        self.assertGreater(food_item["target_saving"], 0)
+        self.assertIn("yatırım bütçesi", analysis["summary"])
+        self.assertIn("mikro tahsilatlar", analysis["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()

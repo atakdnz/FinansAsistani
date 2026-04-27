@@ -66,7 +66,7 @@ Flask uygulamasinin merkezidir.
 - `/api/transactions` OCR'dan cikan islem satirlarini listeler ve kullanici duzeltmelerini kaydeder.
 - Fuzzy uyelik fonksiyonlari, Mamdani kurallari, agregasyon ve centroid durulastirma burada calisir.
 - 10 TL ve altindaki mikro tahsilatlari ham veride tutar ama analiz ve tablo gosteriminden ayirir.
-- Kategori bazli onerileri `build_category_recommendations` ile uretir.
+- Kategori paylarini ve kategoriye ozel aksiyonlari `build_category_analysis` ile uretir.
 
 ### `statement_pdf_pipeline.py`
 

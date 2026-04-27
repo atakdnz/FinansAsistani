@@ -14,7 +14,7 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 8. Gelir duzenliligi, esneklik, acil durum tamponu ve borc yuku hesaplanir.
 9. Kullanici risk toleransi ve yatirim vadesi sliderlarini doldurur.
 10. 6 girdili Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
-11. Kategori bazli kisa finansal oneriler uretilir.
+11. Gider kategorilerinin payi hesaplanir ve kategoriye ozel aksiyon onerileri uretilir.
 
 ## Ana Bilesenler
 
@@ -47,9 +47,11 @@ dalgali portfoylere alan acar.
 ham CSV'de kalir, ancak dashboard islem tablosunda gosterilmez ve toplam gider,
 kategori dagilimi, fuzzy girdiler ve aylik trend hesaplarini etkilemez.
 
-Dashboard ayrica kategori bazli oneriler uretir. Borc yuku, gida/alisveris
-agirligi, banka ucretleri, acil durum tamponu ve tasarruf orani gibi sinyaller
-kisa oneri kartlarina donusturulur.
+Dashboard ayrica kategori bazli gider analizi uretir. Her kategori icin toplam
+gider icindeki pay, tasarruf potansiyeli ve kategoriye ozel aksiyon metni
+gosterilir. Ornegin gida icin liste/market disiplini, ulastirma icin toplu
+tasima veya paylasim, konut/fatura icin uzun vadeli tarife ve abonelik kontrolu
+onerilir.
 
 ## OCR Normalizasyonu
 

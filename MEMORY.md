@@ -181,7 +181,7 @@ Flask uygulamasi. Endpointler:
 - `/api/risk-profile`: kullanici risk cevaplarini kaydeder/okur.
 - `/api/transactions`: OCR islemlerini listeler ve manuel duzeltmeleri kaydeder.
 - `calculate_financial_metrics`: mikro islemleri ayirir, 6 fuzzy girdiye kaynak olan metrikleri hesaplar.
-- `build_category_recommendations`: borc, gida/alisveris, banka ucreti, tampon ve tasarruf sinyallerinden oneri kartlari uretir.
+- `build_category_analysis`: kategori paylarini, tasarruf potansiyelini, kategoriye ozel aksiyon metinlerini ve toplam tasarruf ozetini uretir.
 
 Fuzzy sistem su anda 6 girdi kullanir:
 
@@ -194,7 +194,7 @@ Fuzzy sistem su anda 6 girdi kullanir:
 
 Kural tabani su anda 17 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
 
-10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar ham CSV'de kalir, ama dashboard islem tablosunda gosterilmez ve toplam gider, kategori dagilimi, aylik trend, fuzzy girdi hesaplari ve kategori onerilerini etkilemez.
+10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar ham CSV'de kalir, ama dashboard islem tablosunda gosterilmez ve toplam gider, kategori dagilimi, aylik trend, fuzzy girdi hesaplari ve kategori analizini etkilemez.
 
 ### `statement_pdf_pipeline.py`
 
