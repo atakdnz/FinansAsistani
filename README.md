@@ -10,9 +10,9 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 4. OCR satirlari tarih, aciklama, tutar ve bakiye alanlarina ayrilir.
 5. Deterministik siniflandirici aciklama ve tutara gore kategori/gider tipi atar.
 6. Dusuk guvenli kayitlar icin embedding tabanli yardimci sinyal kullanilir.
-7. Gelir, gider, esneklik orani ve gelir duzenliligi hesaplanir.
-8. Kullanici risk toleransi sliderlarini doldurur.
-9. Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
+7. Gelir duzenliligi, esneklik, acil durum tamponu ve borc yuku hesaplanir.
+8. Kullanici risk toleransi ve yatirim vadesi sliderlarini doldurur.
+9. 6 girdili Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
 
 ## Ana Bilesenler
 
@@ -22,6 +22,22 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 - `embedding_classifier.py`: Dusuk guvenli kayitlar icin opsiyonel embedding onerisi.
 - `templates/index.html`: PDF yukleme, OCR islem duzeltme tablosu, risk profili ve analiz dashboard'u.
 - `PROJECT_OVERVIEW.md`: Ekip icin kod rehberi, mevcut durum ve gelistirme onerileri.
+
+## Bulanik Mantik Girdileri
+
+Ana fuzzy sistem 6 girdi kullanir:
+
+- Gelir duzenliligi
+- Esneklik orani
+- Risk toleransi
+- Yatirim vadesi
+- Acil durum tamponu
+- Borc yuku orani
+
+Risk toleransi kullanicinin kayip ve dalgalanmaya psikolojik dayanimi olarak
+hesaplanir. Yatirim vadesi ayri girdi olarak tutulur; uzun vade tek basina
+agresif profil uretmez, sadece risk toleransi ve finansal tampon uygunsa daha
+dalgali portfoylere alan acar.
 
 ## OCR Normalizasyonu
 

@@ -182,7 +182,7 @@ async function saveRiskProfile(){
     });
     const payload = await res.json();
     if(!res.ok) throw new Error('Risk profili kaydedilemedi');
-    status.textContent = `Risk toleransı: ${payload.risk_tolerance.toFixed(4)}`;
+    status.textContent = `Risk toleransı: ${payload.risk_tolerance.toFixed(4)} · Yatırım vadesi: ${payload.investment_horizon.toFixed(4)}`;
     const data = await loadData();
     render(data);
   }catch(e){
@@ -394,11 +394,16 @@ function render(d){
   const cls = d.banka.siniflandirma || {toplam:0,dusuk_guven_adedi:0,yontemler:{},dusuk_guven_ornekleri:[]};
   const transactions = d.banka.transactions || [];
   const options = d.options || {categories:[],expense_types:[]};
+  const answers = d.profile?.answers || {};
+  const sliderValue = (key, fallback)=>Number(answers[key] ?? fallback).toFixed(2);
 
   const mfKeys = [
     ['gelir_duzenliligi','Gelir Düzenliliği','mf1'],
     ['esneklik_orani','Esneklik Oranı','mf2'],
-    ['risk_toleransi','Risk Toleransı','mf3']
+    ['risk_toleransi','Risk Toleransı','mf3'],
+    ['yatirim_vadesi','Yatırım Vadesi','mf4'],
+    ['acil_durum_tamponu','Acil Durum Tamponu','mf5'],
+    ['borc_yuku','Borç Yükü','mf6']
   ];
 
   const concClass = {'Güvenilir':'conc-g','Dengeli':'conc-d','Agresif':'conc-a'};
@@ -420,29 +425,29 @@ function render(d){
       <div class="status" id="uploadStatus">Veri kaynağı: ${d.banka.kaynak || 'CSV'}</div>
     </div>
     <div class="card">
-      <div class="card-title">Risk Toleransı</div>
+      <div class="card-title">Risk ve Yatırım Vadesi</div>
       <div class="slider-row">
         <label>Kısa vadeli kayıpta sakin kalma</label>
-        <input data-risk="loss_reaction" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <input data-risk="loss_reaction" type="range" min="0" max="1" step="0.05" value="${sliderValue('loss_reaction', d.inputs.risk)}">
         <div class="slider-val" data-risk-value="loss_reaction"></div>
       </div>
       <div class="slider-row">
         <label>Yatırım ufku uzunluğu</label>
-        <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon', d.inputs.vade)}">
         <div class="slider-val" data-risk-value="investment_horizon"></div>
       </div>
       <div class="slider-row">
         <label>Dalgalanmaya tolerans</label>
-        <input data-risk="volatility_comfort" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <input data-risk="volatility_comfort" type="range" min="0" max="1" step="0.05" value="${sliderValue('volatility_comfort', d.inputs.risk)}">
         <div class="slider-val" data-risk-value="volatility_comfort"></div>
       </div>
       <div class="slider-row">
         <label>Büyüme getirisi tercihi</label>
-        <input data-risk="growth_preference" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <input data-risk="growth_preference" type="range" min="0" max="1" step="0.05" value="${sliderValue('growth_preference', d.inputs.risk)}">
         <div class="slider-val" data-risk-value="growth_preference"></div>
       </div>
       <button class="btn" id="riskBtn" type="button">Risk Profilini Kaydet</button>
-      <div class="status" id="riskStatus">Mevcut risk toleransı: ${d.inputs.risk.toFixed(4)}</div>
+      <div class="status" id="riskStatus">Risk toleransı: ${d.inputs.risk.toFixed(4)} · Yatırım vadesi: ${d.inputs.vade.toFixed(4)}</div>
     </div>
   </div>
 
@@ -542,7 +547,7 @@ function render(d){
   <div class="section-title"><span>⚙️</span> Mamdani Kuralları & Çıktı</div>
   <div class="grid2">
     <div class="card">
-      <div class="card-title">9 Kural — Aktivasyon Kuvvetleri</div>
+      <div class="card-title">15 Kural — Aktivasyon Kuvvetleri</div>
       ${d.rules.map(r=>`
       <div class="rule-item ${r.active?'active':''}">
         <div class="rule-id">${r.id}</div>

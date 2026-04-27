@@ -13,7 +13,7 @@ Proje artik sadece hazir CSV gosteren bir demo degil. Ana akis su sekilde calisi
 5. `transaction_classifier.py` aciklama ve tutara gore kategori/gider tipi uretir.
 6. Dusuk guvenli satirlar varsa `embedding_classifier.py` embedding benzerligi ile yardimci kategori onerir.
 7. Kullanici OCR'dan cikan islem satirlarini arayuzden kontrol edip duzeltebilir.
-8. `app.py` gelir/gider metriklerini, esneklik oranini, gelir duzenliligini ve risk toleransini fuzzy sisteme verir.
+8. `app.py` gelir duzenliligi, esneklik, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yukunu fuzzy sisteme verir.
 9. Mamdani cikarimi ve centroid durulastirma ile yatirim profili uretilir.
 10. `templates/index.html` sonucu dashboard olarak gosterir.
 
@@ -103,6 +103,7 @@ Kullanici arayuzudur.
 
 - PDF yukleme alani vardir.
 - Risk toleransi slider'lari vardir.
+- Yatirim vadesi risk toleransindan ayri fuzzy girdi olarak kullanilir.
 - Onerilen yatirim profili gosterilir.
 - Gelir/gider ozetleri gosterilir.
 - Siniflandirma yontemi ve dusuk guvenli kayit sayisi gosterilir.
@@ -126,6 +127,9 @@ Yapildi:
 - OCR islem kontrol ve manuel duzeltme ekrani eklendi.
 - Kullanici risk toleransi arayuzden alinir hale geldi.
 - Risk toleransi fuzzy sisteme baglandi.
+- Yatirim vadesi risk toleransi ortalamasindan ayrilip bagimsiz fuzzy girdi yapildi.
+- Acil durum tamponu ve borc yuku hesap dokumunden hesaplanip fuzzy sisteme eklendi.
+- Fuzzy kural tabani 6 girdi kullanan 15 hedefli Mamdani kuralina genisletildi.
 - Sentetik CSV'ye bagimlilik azaltildi.
 - Deterministik siniflandirma sistemi eklendi.
 - Embedding destekli yardimci siniflandirma eklendi.
@@ -142,17 +146,16 @@ Kismen yapildi:
 
 Henuz yapilmadi:
 
-- Fuzzy kural tabani 27 kombinasyona veya daha hedefli 14-18 kurala genisletilmedi.
 - PDF parser farkli banka formatlarina karsi kapsamli test edilmedi.
 - Kategori bazli detayli tasarruf oneri motoru henuz sinirli.
-- Esneklik disinda tasarruf orani veya kisilabilir gider orani gibi ek fuzzy girdiler henuz eklenmedi.
+- Mikro banka tahsilatlarini analiz etkisinden ayri tutma henuz eklenmedi.
 - Fuzzy mantik kodu ayri bir servis modulune tasinmadi.
 
 ## Sunumda Nasil Anlatilir?
 
 Kisa teknik cumle:
 
-> Sistem, kullanicinin yukledigi banka PDF'ini PaddleOCR ile okuyarak islem satirlarina ayirir. Islemler once kural tabanli deterministik siniflandirici ile kategorize edilir. Belirsiz islemler icin embedding tabanli benzerlik modeli yardimci karar mekanizmasi olarak kullanilir. Sonrasinda gelir duzenliligi, esneklik orani ve kullanicidan alinan risk toleransi Mamdani bulanik cikarim sistemine verilerek yatirim profili olusturulur.
+> Sistem, kullanicinin yukledigi banka PDF'ini PaddleOCR ile okuyarak islem satirlarina ayirir. Islemler once kural tabanli deterministik siniflandirici ile kategorize edilir. Belirsiz islemler icin embedding tabanli benzerlik modeli yardimci karar mekanizmasi olarak kullanilir. Sonrasinda gelir duzenliligi, esneklik orani, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yuku 15 kuralli Mamdani bulanik cikarim sistemine verilerek yatirim profili olusturulur.
 
 ## Mantikli Sonraki Gelistirmeler
 
@@ -174,7 +177,7 @@ Kisa teknik cumle:
 
 4. **Fuzzy kural tabanini genisletmek**
 
-   Su an 9 temel kural var. 3 girdi x 3 seviye icin 27 kombinasyon daha sistematik yazilabilir. Ancak mevcut sistem calisir ve anlasilir durumda.
+   Su an 6 girdiyi kullanan 15 hedefli kural var. Ileride kural agirliklari daha fazla ornek senaryoyla test edilip ince ayar yapilabilir.
 
 5. **Portfoy dagilimini daha aciklanabilir yapmak**
 
@@ -184,13 +187,10 @@ Kisa teknik cumle:
 
    Kullanici birkac aylik dokum yuklerse gelir duzenliligi daha gercekci hesaplanir.
 
-7. **Ek fuzzy girdileri tartismak**
+7. **Ek veri kaynaklarini tartismak**
 
    Ekip karari sonrasi su girdiler eklenebilir:
 
-   - Acil durum tamponu: son bakiye / aylik zorunlu gider. Tampon zayifsa agresif portfoy baskilanir.
-   - Borc yuku orani: kredi/kart/borc odemeleri / gelir. Borc yuksekse sistem daha temkinli olur.
-   - Yatirim vadesi: kullanicidan sorulur. Uzun vade, risk toleransi da uygunsa daha dalgali varliklara alan acar; kisa vade daha korumaci profil gerektirir.
    - Harcama volatilitesi: aylik gider oynakligi. Giderler cok degisiyorsa finansal planlama riski artar.
    - Piyasa risk seviyesi: opsiyonel internet verisi. Demo bagimliligi yaratmamasi icin fallback ile tasarlanmalidir.
 

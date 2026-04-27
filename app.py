@@ -77,13 +77,125 @@ def save_user_profile(profile):
         json.dump(profile, handle, ensure_ascii=False, indent=2)
 
 def calculate_risk_score(payload):
-    scores = [
-        float(payload.get("loss_reaction", 0.5)),
-        float(payload.get("investment_horizon", 0.5)),
-        float(payload.get("volatility_comfort", 0.5)),
-        float(payload.get("growth_preference", 0.5)),
-    ]
+    risk_keys = ("loss_reaction", "volatility_comfort", "growth_preference")
+    scores = [float(payload.get(key, 0.5)) for key in risk_keys]
     return clamp01(sum(scores) / len(scores))
+
+def calculate_investment_horizon(payload):
+    return clamp01(float(payload.get("investment_horizon", 0.5)))
+
+def _profile_defaults(profile):
+    answers = profile.get("answers", {})
+    risk = float(profile.get("risk_tolerance", 0.5))
+    horizon = float(profile.get("investment_horizon", answers.get("investment_horizon", risk)))
+    return {
+        "risk_tolerance": clamp01(risk),
+        "investment_horizon": clamp01(horizon),
+        "answers": {
+            "loss_reaction": clamp01(answers.get("loss_reaction", risk)),
+            "investment_horizon": clamp01(answers.get("investment_horizon", horizon)),
+            "volatility_comfort": clamp01(answers.get("volatility_comfort", risk)),
+            "growth_preference": clamp01(answers.get("growth_preference", risk)),
+        },
+    }
+
+def fallback_risk_score(fallback_ozet):
+    if "Risk Tolerans (0-1)" in fallback_ozet:
+        return clamp01(float(fallback_ozet["Risk Tolerans (0-1)"].iloc[0]))
+    return 0.5
+
+def calculate_financial_metrics(banka):
+    gelirler = banka[banka["Tutar"] > 0]
+    giderler = banka[banka["Tutar"] < 0].copy()
+    giderler["Abs"] = giderler["Tutar"].abs()
+
+    toplam_gelir = float(gelirler["Tutar"].sum())
+    toplam_gider = float(giderler["Abs"].sum())
+    zorunlu_gider = float(giderler[giderler["Gider Tipi"] == "Zorunlu"]["Abs"].sum())
+    borc_gider = float(giderler[giderler["Kategori"] == "Borç/Kredi/Kart"]["Abs"].sum())
+    esnek_gider_tipleri = ["Kısılabilir", "İsteğe Bağlı"]
+    esnek_gider = float(giderler[giderler["Gider Tipi"].isin(esnek_gider_tipleri)]["Abs"].sum())
+
+    esneklik = clamp01((toplam_gelir - zorunlu_gider) / toplam_gelir) if toplam_gelir > 0 else 0.0
+    borc_yuku = clamp01(borc_gider / toplam_gelir) if toplam_gelir > 0 else 0.0
+    tasarruf_orani = clamp01((toplam_gelir - toplam_gider) / toplam_gelir) if toplam_gelir > 0 else 0.0
+    kisilabilir_oran = clamp01(esnek_gider / toplam_gider) if toplam_gider > 0 else 0.0
+
+    aylik_gelir = gelirler.groupby("Ay")["Tutar"].sum()
+    aylik_gider = giderler.groupby("Ay")["Abs"].sum()
+    aylik_zorunlu = giderler[giderler["Gider Tipi"] == "Zorunlu"].groupby("Ay")["Abs"].sum()
+    aylik_tasarruf = aylik_gelir.subtract(aylik_gider, fill_value=0)
+
+    if len(aylik_gelir) >= 2 and float(aylik_gelir.mean()) > 0:
+        duzenlilik = 1 - min(1.0, float(aylik_gelir.std()) / float(aylik_gelir.mean()))
+    elif len(aylik_gelir) == 1:
+        duzenlilik = 0.65
+    else:
+        duzenlilik = 0.0
+
+    son_bakiye = None
+    if "Bakiye" in banka.columns:
+        parsed_balance = banka["Bakiye"].apply(lambda value: np.nan if pd.isna(value) else parse_amount(value))
+        dated_balance = pd.DataFrame({"Tarih": banka["Tarih"], "Bakiye": parsed_balance}).dropna()
+        if not dated_balance.empty:
+            son_bakiye = float(dated_balance.sort_values("Tarih")["Bakiye"].iloc[-1])
+
+    aylik_zorunlu_ort = float(aylik_zorunlu.mean()) if not aylik_zorunlu.empty else 0.0
+    if son_bakiye is not None and aylik_zorunlu_ort > 0:
+        tampon_ay = max(0.0, son_bakiye / aylik_zorunlu_ort)
+        acil_tampon = clamp01(tampon_ay / 3.0)
+    else:
+        tampon_ay = None
+        acil_tampon = 0.5
+
+    return {
+        "gelirler": gelirler,
+        "giderler": giderler,
+        "toplam_gelir": toplam_gelir,
+        "toplam_gider": toplam_gider,
+        "zorunlu_gider": zorunlu_gider,
+        "borc_gider": borc_gider,
+        "esnek_gider": esnek_gider,
+        "esneklik": esneklik,
+        "borc_yuku": borc_yuku,
+        "tasarruf_orani": tasarruf_orani,
+        "kisilabilir_oran": kisilabilir_oran,
+        "duzenlilik": clamp01(duzenlilik),
+        "acil_tampon": acil_tampon,
+        "tampon_ay": tampon_ay,
+        "aylik_gelir": aylik_gelir,
+        "aylik_gider": aylik_gider,
+        "aylik_tasarruf": aylik_tasarruf,
+    }
+
+def compute_fuzzy_inputs(banka, fallback_ozet):
+    metrics = calculate_financial_metrics(banka)
+    raw_profile = load_user_profile()
+    profile = _profile_defaults(raw_profile)
+    if raw_profile:
+        risk = profile["risk_tolerance"]
+        vade = profile["investment_horizon"]
+    else:
+        risk = fallback_risk_score(fallback_ozet)
+        vade = 0.5
+        profile = _profile_defaults({
+            "risk_tolerance": risk,
+            "investment_horizon": vade,
+            "answers": {
+                "loss_reaction": risk,
+                "investment_horizon": vade,
+                "volatility_comfort": risk,
+                "growth_preference": risk,
+            },
+        })
+    return {
+        "esneklik": clamp01(metrics["esneklik"]),
+        "duzenlilik": clamp01(metrics["duzenlilik"]),
+        "risk": clamp01(risk),
+        "vade": clamp01(vade),
+        "tampon": clamp01(metrics["acil_tampon"]),
+        "borc": clamp01(metrics["borc_yuku"]),
+    }, metrics, profile
 
 def prepare_bank_data(banka):
     banka = banka.copy()
@@ -117,32 +229,6 @@ def _raw_transaction_rows():
         })
     return rows
 
-def compute_fuzzy_inputs(banka, fallback_ozet):
-    gelirler = banka[banka["Tutar"] > 0]
-    giderler = banka[banka["Tutar"] < 0].copy()
-    giderler["Abs"] = giderler["Tutar"].abs()
-
-    toplam_gelir = float(gelirler["Tutar"].sum())
-    zorunlu_gider = float(giderler[giderler["Gider Tipi"] == "Zorunlu"]["Abs"].sum())
-    esneklik = clamp01((toplam_gelir - zorunlu_gider) / toplam_gelir) if toplam_gelir > 0 else 0.0
-
-    aylik_gelir = gelirler.groupby("Ay")["Tutar"].sum()
-    if len(aylik_gelir) >= 2 and float(aylik_gelir.mean()) > 0:
-        duzenlilik = 1 - min(1.0, float(aylik_gelir.std()) / float(aylik_gelir.mean()))
-    elif len(aylik_gelir) == 1:
-        duzenlilik = 0.65
-    else:
-        duzenlilik = 0.0
-
-    profile = load_user_profile()
-    if "risk_tolerance" in profile:
-        risk = float(profile["risk_tolerance"])
-    elif "Risk Tolerans (0-1)" in fallback_ozet:
-        risk = float(fallback_ozet["Risk Tolerans (0-1)"].iloc[0])
-    else:
-        risk = 0.5
-    return clamp01(esneklik), clamp01(duzenlilik), clamp01(risk)
-
 def run_fuzzy():
     # ── CSV Oku ──────────────────────────────────────────────
     ozet  = pd.read_csv(OZET_PATH)
@@ -151,19 +237,20 @@ def run_fuzzy():
 
     # ── Banka Analizi ───────────────────────────────────────
     banka = prepare_bank_data(banka)
-    esn, duz, risk = compute_fuzzy_inputs(banka, ozet)
+    inputs, metrics, profile = compute_fuzzy_inputs(banka, ozet)
+    esn = inputs["esneklik"]
+    duz = inputs["duzenlilik"]
+    risk = inputs["risk"]
+    vade = inputs["vade"]
+    tampon = inputs["tampon"]
+    borc = inputs["borc"]
 
-    gelirler = banka[banka["Tutar"] > 0]
-    giderler = banka[banka["Tutar"] < 0].copy()
-    giderler["Abs"] = giderler["Tutar"].abs()
-
-    aylik_gelir  = gelirler.groupby("Ay")["Tutar"].sum()
-    aylik_gider  = giderler.groupby("Ay")["Abs"].sum()
-    aylik_tasarruf = aylik_gelir.subtract(aylik_gider, fill_value=0)
+    giderler = metrics["giderler"]
+    aylik_gelir = metrics["aylik_gelir"]
+    aylik_gider = metrics["aylik_gider"]
+    aylik_tasarruf = metrics["aylik_tasarruf"]
 
     kat_gider = giderler.groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
-    esnek_gider_tipleri = ["Kısılabilir", "İsteğe Bağlı"]
-    esnek_gider = giderler[giderler["Gider Tipi"].isin(esnek_gider_tipleri)]["Abs"].sum()
     dusuk_guven = banka[banka["Sınıflandırma Güveni"] < 0.50].copy()
 
     # Aylık trend için ay bazında gelir/gider
@@ -190,6 +277,21 @@ def run_fuzzy():
             "Orta"   : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
             "Yüksek" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
         },
+        "vade": {
+            "Kısa" : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
+            "Orta" : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
+            "Uzun" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+        },
+        "tampon": {
+            "Zayıf" : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
+            "Orta"  : fuzz.trapmf(x,[0.30,0.45,0.60,0.78]),
+            "Güçlü" : fuzz.trapmf(x,[0.62,0.80,1.0,1.0]),
+        },
+        "borc": {
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.15,0.30]),
+            "Orta"   : fuzz.trapmf(x,[0.20,0.35,0.48,0.65]),
+            "Yüksek" : fuzz.trapmf(x,[0.50,0.70,1.0,1.0]),
+        },
     }
     mf_out = {
         "Güvenilir": fuzz.trapmf(y,[0.0,0.0,0.20,0.33]),
@@ -201,27 +303,42 @@ def run_fuzzy():
     deg_duz  = {k: interp(x, v, duz)  for k,v in mf["duz"].items()}
     deg_esn  = {k: interp(x, v, esn)  for k,v in mf["esn"].items()}
     deg_risk = {k: interp(x, v, risk) for k,v in mf["risk"].items()}
+    deg_vade = {k: interp(x, v, vade) for k,v in mf["vade"].items()}
+    deg_tampon = {k: interp(x, v, tampon) for k,v in mf["tampon"].items()}
+    deg_borc = {k: interp(x, v, borc) for k,v in mf["borc"].items()}
 
     # ── Kurallar (Mamdani, min) ──────────────────────────────
     kurallar = [
         (deg_risk["Düşük"], "Güvenilir",
          "K1", "Risk = Düşük", "Güvenilir"),
-        (min(deg_risk["Orta"],deg_esn["Düşük"],deg_duz["Düzensiz"]), "Güvenilir",
-         "K2", "Risk=Orta & Esn=Düşük & Gel=Düzensiz", "Güvenilir"),
-        (min(deg_risk["Orta"],deg_esn["Düşük"],deg_duz["Orta"]), "Güvenilir",
-         "K3", "Risk=Orta & Esn=Düşük & Gel=Orta", "Güvenilir"),
-        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Düzensiz"]), "Güvenilir",
-         "K4", "Risk=Orta & Esn=Orta & Gel=Düzensiz", "Güvenilir"),
-        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Orta"]), "Dengeli",
-         "K5", "Risk=Orta & Esn=Orta & Gel=Orta", "Dengeli"),
-        (min(deg_risk["Orta"],deg_esn["Orta"],deg_duz["Düzenli"]), "Dengeli",
-         "K6", "Risk=Orta & Esn=Orta & Gel=Düzenli", "Dengeli"),
-        (min(deg_risk["Orta"],deg_esn["Yüksek"],deg_duz["Orta"]), "Dengeli",
-         "K7", "Risk=Orta & Esn=Yüksek & Gel=Orta", "Dengeli"),
-        (min(deg_risk["Orta"],deg_esn["Yüksek"],deg_duz["Düzenli"]), "Agresif",
-         "K8", "Risk=Orta & Esn=Yüksek & Gel=Düzenli", "Agresif"),
-        (deg_risk["Yüksek"], "Agresif",
-         "K9", "Risk = Yüksek", "Agresif"),
+        (min(deg_tampon["Zayıf"], deg_borc["Yüksek"]), "Güvenilir",
+         "K2", "Tampon=Zayıf & Borç=Yüksek", "Güvenilir"),
+        (min(deg_tampon["Zayıf"], deg_vade["Kısa"]), "Güvenilir",
+         "K3", "Tampon=Zayıf & Vade=Kısa", "Güvenilir"),
+        (min(deg_borc["Yüksek"], deg_esn["Düşük"]), "Güvenilir",
+         "K4", "Borç=Yüksek & Esn=Düşük", "Güvenilir"),
+        (min(deg_risk["Orta"], deg_esn["Düşük"], deg_duz["Düzensiz"]), "Güvenilir",
+         "K5", "Risk=Orta & Esn=Düşük & Gel=Düzensiz", "Güvenilir"),
+        (min(deg_risk["Yüksek"], deg_vade["Kısa"]), "Dengeli",
+         "K6", "Risk=Yüksek & Vade=Kısa", "Dengeli"),
+        (min(deg_risk["Orta"], deg_esn["Orta"], deg_tampon["Orta"]), "Dengeli",
+         "K7", "Risk=Orta & Esn=Orta & Tampon=Orta", "Dengeli"),
+        (min(deg_risk["Orta"], deg_vade["Uzun"], deg_borc["Düşük"]), "Dengeli",
+         "K8", "Risk=Orta & Vade=Uzun & Borç=Düşük", "Dengeli"),
+        (min(deg_esn["Yüksek"], deg_duz["Düzenli"], deg_tampon["Güçlü"]), "Dengeli",
+         "K9", "Esn=Yüksek & Gel=Düzenli & Tampon=Güçlü", "Dengeli"),
+        (min(deg_risk["Yüksek"], deg_esn["Orta"], deg_vade["Orta"], deg_borc["Düşük"]), "Dengeli",
+         "K10", "Risk=Yüksek & Esn=Orta & Vade=Orta & Borç=Düşük", "Dengeli"),
+        (min(deg_risk["Orta"], deg_esn["Yüksek"], deg_vade["Uzun"], deg_tampon["Güçlü"]), "Dengeli",
+         "K11", "Risk=Orta & Esn=Yüksek & Vade=Uzun & Tampon=Güçlü", "Dengeli"),
+        (min(deg_risk["Yüksek"], deg_vade["Uzun"], deg_esn["Yüksek"], deg_tampon["Güçlü"], deg_borc["Düşük"]), "Agresif",
+         "K12", "Risk=Yüksek & Vade=Uzun & Esn=Yüksek & Tampon=Güçlü & Borç=Düşük", "Agresif"),
+        (min(deg_risk["Yüksek"], deg_vade["Uzun"], deg_esn["Yüksek"], deg_duz["Düzenli"]), "Agresif",
+         "K13", "Risk=Yüksek & Vade=Uzun & Esn=Yüksek & Gel=Düzenli", "Agresif"),
+        (min(deg_risk["Yüksek"], deg_vade["Orta"], deg_esn["Yüksek"], deg_tampon["Güçlü"], deg_borc["Düşük"]), "Agresif",
+         "K14", "Risk=Yüksek & Vade=Orta & Esn=Yüksek & Tampon=Güçlü & Borç=Düşük", "Agresif"),
+        (min(deg_risk["Yüksek"], deg_vade["Uzun"], deg_borc["Orta"], deg_tampon["Güçlü"]), "Dengeli",
+         "K15", "Risk=Yüksek & Vade=Uzun & Borç=Orta & Tampon=Güçlü", "Dengeli"),
     ]
 
     rules_out = []
@@ -286,6 +403,21 @@ def run_fuzzy():
             "curves": {k: mf_to_points(x, v) for k,v in mf["risk"].items()},
             "degrees": {k: round(v,4) for k,v in deg_risk.items()}
         },
+        "yatirim_vadesi": {
+            "value": round(vade,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["vade"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_vade.items()}
+        },
+        "acil_durum_tamponu": {
+            "value": round(tampon,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["tampon"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_tampon.items()}
+        },
+        "borc_yuku": {
+            "value": round(borc,4),
+            "curves": {k: mf_to_points(x, v) for k,v in mf["borc"].items()},
+            "degrees": {k: round(v,4) for k,v in deg_borc.items()}
+        },
     }
 
     output_chart = {
@@ -296,7 +428,15 @@ def run_fuzzy():
     }
 
     return {
-        "inputs": {"esneklik": round(esn,4), "duzenlilik": round(duz,4), "risk": round(risk,4)},
+        "inputs": {
+            "esneklik": round(esn,4),
+            "duzenlilik": round(duz,4),
+            "risk": round(risk,4),
+            "vade": round(vade,4),
+            "tampon": round(tampon,4),
+            "borc": round(borc,4),
+        },
+        "profile": profile,
         "options": {"categories": CATEGORY_OPTIONS, "expense_types": EXPENSE_TYPE_OPTIONS},
         "mf_charts": mf_charts,
         "output_chart": output_chart,
@@ -306,12 +446,17 @@ def run_fuzzy():
         "portfolyo": portfolyolar[profil],
         "banka": {
             "kaynak": banka_kaynak,
-            "toplam_gelir": round(float(banka[banka["Tutar"]>0]["Tutar"].sum()),2),
-            "toplam_gider": round(float(banka[banka["Tutar"]<0]["Tutar"].abs().sum()),2),
+            "toplam_gelir": round(float(metrics["toplam_gelir"]),2),
+            "toplam_gider": round(float(metrics["toplam_gider"]),2),
             "aylik_gelir_ort": round(float(aylik_gelir.mean()),2),
             "aylik_gider_ort": round(float(aylik_gider.mean()),2),
             "aylik_tasarruf_ort": round(float(aylik_tasarruf.mean()),2),
-            "istege_bagli": round(float(esnek_gider),2),
+            "istege_bagli": round(float(metrics["esnek_gider"]),2),
+            "borc_yuku_orani": round(float(metrics["borc_yuku"]),4),
+            "acil_durum_tamponu": round(float(metrics["acil_tampon"]),4),
+            "tampon_ay": None if metrics["tampon_ay"] is None else round(float(metrics["tampon_ay"]),2),
+            "tasarruf_orani": round(float(metrics["tasarruf_orani"]),4),
+            "kisilabilir_oran": round(float(metrics["kisilabilir_oran"]),4),
             "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
             "siniflandirma": {
                 "toplam": int(len(banka)),
@@ -413,15 +558,19 @@ def upload_statement():
 def risk_profile():
     if request.method == "GET":
         profile = load_user_profile()
+        profile = _profile_defaults(profile)
         return jsonify({
             "risk_tolerance": round(float(profile.get("risk_tolerance", 0.5)), 4),
+            "investment_horizon": round(float(profile.get("investment_horizon", 0.5)), 4),
             "answers": profile.get("answers", {}),
         })
 
     payload = request.get_json(silent=True) or {}
     score = calculate_risk_score(payload)
+    horizon = calculate_investment_horizon(payload)
     profile = {
         "risk_tolerance": round(score, 4),
+        "investment_horizon": round(horizon, 4),
         "answers": {k: clamp01(v) for k, v in payload.items()},
     }
     save_user_profile(profile)

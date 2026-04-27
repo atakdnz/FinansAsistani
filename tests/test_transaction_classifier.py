@@ -97,6 +97,53 @@ class TransactionClassifierTests(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_risk_score_keeps_investment_horizon_separate(self):
+        payload = {
+            "loss_reaction": 0.2,
+            "investment_horizon": 1.0,
+            "volatility_comfort": 0.4,
+            "growth_preference": 0.6,
+        }
+
+        self.assertAlmostEqual(finance_app.calculate_risk_score(payload), 0.4)
+        self.assertEqual(finance_app.calculate_investment_horizon(payload), 1.0)
+
+    def test_financial_metrics_include_debt_and_emergency_buffer(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "Tarih": pd.Timestamp("2026-04-01"),
+                    "Tutar": 10000.0,
+                    "Kategori": "Gelir",
+                    "Gider Tipi": "Gelir",
+                    "Bakiye": 15000.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+                {
+                    "Tarih": pd.Timestamp("2026-04-03"),
+                    "Tutar": -2000.0,
+                    "Kategori": "Borç/Kredi/Kart",
+                    "Gider Tipi": "Zorunlu",
+                    "Bakiye": 13000.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+                {
+                    "Tarih": pd.Timestamp("2026-04-04"),
+                    "Tutar": -1000.0,
+                    "Kategori": "Gıda",
+                    "Gider Tipi": "Kısılabilir",
+                    "Bakiye": 12000.0,
+                    "Ay": pd.Period("2026-04"),
+                },
+            ]
+        )
+
+        metrics = finance_app.calculate_financial_metrics(df)
+
+        self.assertAlmostEqual(metrics["borc_yuku"], 0.2)
+        self.assertAlmostEqual(metrics["esneklik"], 0.8)
+        self.assertEqual(metrics["acil_tampon"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

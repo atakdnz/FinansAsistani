@@ -10,7 +10,7 @@ Bu repo, Bulanik Mantik dersi icin gelistirilen kisisel finans asistanidir. Sunu
 2. Sistem PDF'ten islemleri otomatik cikarir.
 3. Islemler kategori ve gider tipine ayrilir.
 4. Kullanici risk toleransi sorularini yanitlar.
-5. Gelir duzenliligi, esneklik ve risk toleransi Mamdani bulanik mantik sistemine girer.
+5. Gelir duzenliligi, esneklik, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yuku Mamdani bulanik mantik sistemine girer.
 6. Sistem yatirim profili ve portfoy onerisi uretir.
 
 Sunuma yuzde yuz birebir uyum zorunlu degil. Onemli olan calisan, savunulabilir ve teknik olarak tutarli bir ders projesidir.
@@ -56,13 +56,17 @@ Bu ortamdaki sandbox nedeniyle `.git` yazan git komutlari cogunlukla escalated c
 - `96ced67 Add PDF upload and risk profile flow`
 - `6f508ce Document OCR finance assistant flow`
 - `2b23bc7 Use Latin PaddleOCR recognition for Turkish statements`
+- `2324b00 Add OCR correction workflow docs`
+- `c08bc51 Document optional fuzzy inputs`
 
-Bu MEMORY dosyasi yazilirken uncommitted degisiklikler:
+Bu MEMORY dosyasi sonradan 6 girdili fuzzy sisteme gore guncellendi. Bu oturumdaki yeni degisiklikler commitlenirken listeye yeni commit SHA'si eklenmelidir.
 
-- OCR islem kontrol ve manuel duzeltme endpointi.
-- Arayuzde OCR satirlarini duzenleme tablosu.
-- Saglik kategorisi.
-- README ve proje ozeti guncellemeleri.
+Yeni 6 girdili fuzzy degisiklikleri:
+
+- Yatirim vadesi risk toleransi ortalamasindan ayrildi.
+- Acil durum tamponu hesap dokumundeki bakiye ve zorunlu giderden hesaplandi.
+- Borc yuku orani kredi/kart/borc odemeleri uzerinden hesaplandi.
+- Kural tabani 15 hedefli Mamdani kuralina cikti.
 
 ## Calisma Ortami
 
@@ -175,13 +179,16 @@ Flask uygulamasi. Endpointler:
 - `/api/risk-profile`: kullanici risk cevaplarini kaydeder/okur.
 - `/api/transactions`: OCR islemlerini listeler ve manuel duzeltmeleri kaydeder.
 
-Fuzzy sistem su anda 3 girdi kullanir:
+Fuzzy sistem su anda 6 girdi kullanir:
 
 - `esneklik`: gelirden zorunlu giderler ciktiktan sonra kalan oran.
 - `duzenlilik`: aylik gelirlerin duzenliligi.
-- `risk`: kullanicinin risk toleransi.
+- `risk`: kullanicinin kayip ve dalgalanmaya psikolojik toleransi.
+- `vade`: kullanicinin yatirim ufku.
+- `tampon`: son bakiye / aylik ortalama zorunlu gider uzerinden acil durum tamponu.
+- `borc`: borc/kredi/kart odemeleri / toplam gelir.
 
-Kural tabani su anda 9 Mamdani kuralidir. Bu yeterli calisir ama gelistirme icin genisletilebilir.
+Kural tabani su anda 15 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
 
 ### `statement_pdf_pipeline.py`
 
@@ -257,7 +264,7 @@ Kisaca: Harcamalarin ne kadari azaltmaya uygun? Bu daha cok tasarruf potansiyeli
 
 Kisaca: Kullanici gelirinin ne kadarini ay sonunda elde tutuyor? Bu mevcut finansal davranisi gosterir.
 
-Bu iki yeni metrik fuzzy sisteme eklenebilir:
+Bu iki metrik su an dashboard/gelecek oneri motoru icin anlamli adaylardir; ana fuzzy sisteme henuz girdi olarak eklenmedi:
 
 - `kisilabilir_gider_orani`: harcama azaltma potansiyeli.
 - `tasarruf_orani`: finansal tampon/likidite davranisi.
@@ -266,18 +273,17 @@ Bu iki yeni metrik fuzzy sisteme eklenebilir:
 
 Zorunlu olmayan ama projeyi guclendirecek alanlar:
 
-1. Fuzzy girdi sayisini 3'ten 4 veya 5'e cikarmak.
-2. Kural tabanini 9 kuraldan hedefli 14-18 kurala genisletmek.
-3. Kategori bazli tasarruf onerileri uretmek.
-4. OCR duzeltme ekraninda dusuk guvenli satirlari vurgulamak.
-5. Farkli banka PDF formatlariyla test yapmak.
-6. Fuzzy hesaplamayi `app.py` icinden ayri bir servis modulune tasimak.
+1. Kategori bazli tasarruf onerileri uretmek.
+2. Mikro banka tahsilatlarini analiz etkisinden ayri tutmak.
+3. OCR duzeltme ekraninda dusuk guvenli satirlari vurgulamak.
+4. Fuzzy kural agirliklarini daha fazla senaryoyla ince ayar yapmak.
+5. Fuzzy hesaplamayi `app.py` icinden ayri bir servis modulune tasimak.
 
 Farkli banka PDF'i bulmak zor olabilir; bu ders projesi icin sart degil. Mevcut akisin tek banka dokumunde stabil calismasi daha onemli.
 
-## Tartisilacak Ek Fuzzy Girdiler
+## Fuzzy Girdi Kararlari
 
-Bu girdiler hemen uygulanmadi. Ekip karari sonrasi eklenebilir.
+Acil durum tamponu, borc yuku ve yatirim vadesi artik uygulandi. Harcama volatilitesi ve piyasa risk seviyesi henuz uygulanmadi.
 
 ### Acil Durum Tamponu
 
@@ -365,17 +371,14 @@ Etkisi:
 
 En mantikli sonraki teknik adim:
 
-1. `app.py` icinde `tasarruf_orani` ve `kisilabilir_gider_orani` hesapla.
-2. Bunlari dashboard'da metrik olarak goster.
-3. Fuzzy sisteme en az birini dorduncu girdi olarak ekle.
-4. 9 kural yerine hedefli 14-18 kural yaz.
-5. Kategori bazli basit oneri motoru ekle:
+1. Kategori bazli basit oneri motoru ekle:
    - Gida yuksekse market/restoran ayrimi ve azaltma onerisi.
    - Istegi bagli yuksekse abonelik/eglence onerisi.
    - Banka ucreti yuksekse EFT/FAST/hesap paketi onerisi.
    - Borc/Kredi/Kart yuksekse borc yukunu azaltma onerisi.
-
-Bu, sunumda "bulanik mantik kismi gelismis" gorunmesini saglar ve gercekten anlamli girdiler kullanir.
+2. Mikro BSMV/komisyon gibi cok kucuk islemleri toplam analiz etkisinden ayir.
+3. Frontend'deki ders anlatimi gibi duran bolumleri sade bir demo akisi haline getir.
+4. Fuzzy hesaplamayi ayri servis modulune tasiyarak `app.py` dosyasini sadeleştir.
 
 ## Dikkat Edilecek Noktalar
 
