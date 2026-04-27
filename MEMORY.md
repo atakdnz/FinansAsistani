@@ -275,6 +275,92 @@ Zorunlu olmayan ama projeyi guclendirecek alanlar:
 
 Farkli banka PDF'i bulmak zor olabilir; bu ders projesi icin sart degil. Mevcut akisin tek banka dokumunde stabil calismasi daha onemli.
 
+## Tartisilacak Ek Fuzzy Girdiler
+
+Bu girdiler hemen uygulanmadi. Ekip karari sonrasi eklenebilir.
+
+### Acil Durum Tamponu
+
+Kaynak: Hesap dokumundeki son bakiye ve zorunlu giderler.
+
+Formul:
+
+```text
+mevcut bakiye / aylik ortalama zorunlu gider
+```
+
+Etkisi:
+
+- Tampon zayifsa agresif portfoy onerisi baskilanir.
+- Tampon gucluyse kullanicinin risk toleransi daha rahat dikkate alinabilir.
+
+### Borc Yuku Orani
+
+Kaynak: Hesap dokumundeki kredi, kredi karti, taksit ve borc odemeleri.
+
+Formul:
+
+```text
+borc/kredi/kart odemeleri / toplam gelir
+```
+
+Etkisi:
+
+- Borc yuku yuksekse sistem daha korumaci veya dengeli profile kayar.
+- Borc yuku dusukse esneklik ve risk toleransi daha etkili olabilir.
+
+### Yatirim Vadesi
+
+Kaynak: Kullanicidan soru.
+
+Ornek soru:
+
+```text
+Bu parayi ne kadar sure yatirimda tutabilirsiniz?
+```
+
+Ornek seviyeler:
+
+- Kisa vade: 0-6 ay
+- Orta vade: 6-24 ay
+- Uzun vade: 24 ay ve uzeri
+
+Etkisi:
+
+- Kisa vadede dalgalanma riski daha tehlikelidir; sistem guvenilir/dengeli tarafa kayar.
+- Uzun vadede kullanici dalgalanmalari bekleyebilir; risk toleransi da yuksekse dengeli/agresif portfoy daha savunulabilir olur.
+- Uzun vade tek basina agresif profil demek degildir; acil durum tamponu, borc yuku ve kullanici risk toleransi ile birlikte yorumlanmalidir.
+
+### Harcama Volatilitesi
+
+Kaynak: Birden fazla aylik dokum varsa hesap dokumu.
+
+Formul:
+
+```text
+aylik gider standart sapmasi / aylik ortalama gider
+```
+
+Etkisi:
+
+- Giderler cok oynaksa finansal planlama riski artar, sistem daha temkinli olur.
+- Stabil giderler daha ongorulebilir bir yatirim davranisini destekler.
+
+### Piyasa Risk Seviyesi
+
+Kaynak: Opsiyonel internet/API verisi.
+
+Ornek sinyaller:
+
+- BIST veya kur oynakligi
+- faiz/enflasyon seviyesi
+- altin veya doviz hareketliligi
+
+Etkisi:
+
+- Piyasa riski yuksekse agresif portfoy agirligi azaltilabilir.
+- Demo sirasinda internet/API bagimliligi riskli oldugu icin opsiyonel ve fallback'li tasarlanmalidir.
+
 ## Onerilen Sonraki Implementasyon
 
 En mantikli sonraki teknik adim:

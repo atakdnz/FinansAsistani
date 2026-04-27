@@ -184,6 +184,16 @@ Kisa teknik cumle:
 
    Kullanici birkac aylik dokum yuklerse gelir duzenliligi daha gercekci hesaplanir.
 
+7. **Ek fuzzy girdileri tartismak**
+
+   Ekip karari sonrasi su girdiler eklenebilir:
+
+   - Acil durum tamponu: son bakiye / aylik zorunlu gider. Tampon zayifsa agresif portfoy baskilanir.
+   - Borc yuku orani: kredi/kart/borc odemeleri / gelir. Borc yuksekse sistem daha temkinli olur.
+   - Yatirim vadesi: kullanicidan sorulur. Uzun vade, risk toleransi da uygunsa daha dalgali varliklara alan acar; kisa vade daha korumaci profil gerektirir.
+   - Harcama volatilitesi: aylik gider oynakligi. Giderler cok degisiyorsa finansal planlama riski artar.
+   - Piyasa risk seviyesi: opsiyonel internet verisi. Demo bagimliligi yaratmamasi icin fallback ile tasarlanmalidir.
+
 ## Mevcut Degerlendirme
 
 Proje artik sunumdaki temel vaadi karsiliyor:
