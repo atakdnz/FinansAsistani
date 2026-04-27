@@ -104,6 +104,18 @@ canvas{max-width:100%}
 .section-title{font-size:1rem;font-weight:700;margin:32px 0 16px;
   display:flex;align-items:center;gap:10px;color:var(--text)}
 .section-title span{font-size:1.2rem}
+.action-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.file-input{flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;padding:10px;color:var(--text)}
+.btn{border:none;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;
+  color:#06111f;background:var(--cyan);transition:opacity .2s,transform .2s}
+.btn:hover{transform:translateY(-1px)}.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.status{font-size:.82rem;color:var(--muted);margin-top:12px;min-height:20px}
+.slider-row{display:grid;grid-template-columns:1fr 180px 44px;gap:12px;align-items:center;margin-bottom:14px}
+.slider-row label{font-size:.85rem;color:var(--text)}
+.slider-row input{width:100%;accent-color:var(--cyan)}
+.slider-val{text-align:right;font-size:.8rem;color:var(--cyan);font-weight:700}
+@media(max-width:720px){.slider-row{grid-template-columns:1fr}.slider-val{text-align:left}}
 </style>
 </head>
 <body>
@@ -124,6 +136,64 @@ const COLORS = ['#22d3ee','#a78bfa','#4ade80','#fb923c','#fbbf24','#f87171','#81
 async function loadData(){
   const res = await fetch('/api/data');
   return res.json();
+}
+
+async function uploadStatement(){
+  const input = document.getElementById('statementFile');
+  const status = document.getElementById('uploadStatus');
+  const button = document.getElementById('uploadBtn');
+  if(!input.files.length){status.textContent='PDF dosyası seçilmedi.';return}
+  const form = new FormData();
+  form.append('statement', input.files[0]);
+  button.disabled = true;
+  status.textContent = 'PDF okunuyor ve işlemler sınıflandırılıyor...';
+  try{
+    const res = await fetch('/api/upload-statement',{method:'POST',body:form});
+    const payload = await res.json();
+    if(!res.ok) throw new Error(payload.error || 'PDF işlenemedi');
+    status.textContent = `${payload.transactions} işlem çıkarıldı.`;
+    const data = await loadData();
+    render(data);
+  }catch(e){
+    status.textContent = e.message;
+  }finally{
+    button.disabled = false;
+  }
+}
+
+async function saveRiskProfile(){
+  const status = document.getElementById('riskStatus');
+  const values = Object.fromEntries([...document.querySelectorAll('[data-risk]')].map(input=>[
+    input.dataset.risk, Number(input.value)
+  ]));
+  status.textContent = 'Risk profili kaydediliyor...';
+  try{
+    const res = await fetch('/api/risk-profile',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(values)
+    });
+    const payload = await res.json();
+    if(!res.ok) throw new Error('Risk profili kaydedilemedi');
+    status.textContent = `Risk toleransı: ${payload.risk_tolerance.toFixed(4)}`;
+    const data = await loadData();
+    render(data);
+  }catch(e){
+    status.textContent = e.message;
+  }
+}
+
+function bindControls(){
+  const uploadBtn = document.getElementById('uploadBtn');
+  const riskBtn = document.getElementById('riskBtn');
+  if(uploadBtn) uploadBtn.addEventListener('click', uploadStatement);
+  if(riskBtn) riskBtn.addEventListener('click', saveRiskProfile);
+  document.querySelectorAll('[data-risk]').forEach(input=>{
+    const out = document.querySelector(`[data-risk-value="${input.dataset.risk}"]`);
+    const update = ()=>{ if(out) out.textContent = Number(input.value).toFixed(2); };
+    input.addEventListener('input', update);
+    update();
+  });
 }
 
 function degColor(v){
@@ -264,6 +334,44 @@ function render(d){
 
   document.getElementById('app').innerHTML = `
 
+  <!-- Kullanıcı girdileri -->
+  <div class="section-title"><span>📄</span> Veri Girişi & Risk Profili</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">PDF Hesap Dökümü</div>
+      <div class="action-row">
+        <input class="file-input" id="statementFile" type="file" accept="application/pdf">
+        <button class="btn" id="uploadBtn" type="button">PDF İşle</button>
+      </div>
+      <div class="status" id="uploadStatus">Veri kaynağı: ${d.banka.kaynak || 'CSV'}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Risk Toleransı</div>
+      <div class="slider-row">
+        <label>Kısa vadeli kayıpta sakin kalma</label>
+        <input data-risk="loss_reaction" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <div class="slider-val" data-risk-value="loss_reaction"></div>
+      </div>
+      <div class="slider-row">
+        <label>Yatırım ufku uzunluğu</label>
+        <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <div class="slider-val" data-risk-value="investment_horizon"></div>
+      </div>
+      <div class="slider-row">
+        <label>Dalgalanmaya tolerans</label>
+        <input data-risk="volatility_comfort" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <div class="slider-val" data-risk-value="volatility_comfort"></div>
+      </div>
+      <div class="slider-row">
+        <label>Büyüme getirisi tercihi</label>
+        <input data-risk="growth_preference" type="range" min="0" max="1" step="0.05" value="${d.inputs.risk}">
+        <div class="slider-val" data-risk-value="growth_preference"></div>
+      </div>
+      <button class="btn" id="riskBtn" type="button">Risk Profilini Kaydet</button>
+      <div class="status" id="riskStatus">Mevcut risk toleransı: ${d.inputs.risk.toFixed(4)}</div>
+    </div>
+  </div>
+
   <!-- Profil -->
   <div class="profile-card" style="border-color:${pc}">
     <div style="font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Önerilen Yatırım Profili</div>
@@ -287,7 +395,7 @@ function render(d){
   <div class="grid4">
     <div class="card"><div class="card-title">Toplam Gelir</div>
       <div class="stat-val cyan">${fmt(d.banka.toplam_gelir)}<span style="font-size:.9rem"> TL</span></div>
-      <div class="stat-sub">12 aylık toplam</div></div>
+      <div class="stat-sub">Veri kaynağı: ${d.banka.kaynak || 'CSV'}</div></div>
     <div class="card"><div class="card-title">Toplam Gider</div>
       <div class="stat-val" style="color:var(--red)">${fmt(d.banka.toplam_gider)}<span style="font-size:.9rem"> TL</span></div>
       <div class="stat-sub">12 aylık toplam</div></div>
@@ -417,6 +525,7 @@ function render(d){
   renderPortoPie('portoPie', porto.items);
   renderKatPie('katPie', d.banka.kategoriler);
   renderMonthly('monthlyChart', d.banka.monthly);
+  bindControls();
 }
 
 loadData().then(render).catch(e=>{

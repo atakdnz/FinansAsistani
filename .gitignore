@@ -23,3 +23,6 @@ Hesap_Hareketleri_*.pdf
 
 # Runtime outputs
 *.log
+extracted_transactions.csv
+user_profile.json
+uploads/

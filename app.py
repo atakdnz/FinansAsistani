@@ -2,10 +2,13 @@
 Kişisel Finans Öneri Asistanı — Flask Web Arayüzü
 """
 import os, sys, json
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import skfuzzy as fuzz
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
+from werkzeug.utils import secure_filename
+from statement_pdf_pipeline import process_pdf
 from transaction_classifier import classify_dataframe, parse_amount
 
 app = Flask(__name__)
@@ -13,6 +16,10 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OZET_PATH  = os.path.join(BASE_DIR, "ozet_hesaplar.csv")
 BANKA_PATH = os.path.join(BASE_DIR, "banka_hareketleri.csv")
+EXTRACTED_PATH = os.path.join(BASE_DIR, "extracted_transactions.csv")
+PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── Üyelik fonksiyon yardımcısı ──────────────────────────────
 x = np.linspace(0, 1, 1000)
@@ -26,22 +33,80 @@ def mf_to_points(x_arr, mf_arr, steps=200):
     idx = np.round(np.linspace(0, len(x_arr)-1, steps)).astype(int)
     return [{"x": round(float(x_arr[i]),4), "y": round(float(mf_arr[i]),4)} for i in idx]
 
+def clamp01(value):
+    return max(0.0, min(1.0, float(value)))
+
+def load_bank_data():
+    if os.path.exists(EXTRACTED_PATH):
+        return pd.read_csv(EXTRACTED_PATH), "PDF OCR"
+    return pd.read_csv(BANKA_PATH), "Demo CSV"
+
+def load_user_profile():
+    if not os.path.exists(PROFILE_PATH):
+        return {}
+    try:
+        with open(PROFILE_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+def save_user_profile(profile):
+    with open(PROFILE_PATH, "w", encoding="utf-8") as handle:
+        json.dump(profile, handle, ensure_ascii=False, indent=2)
+
+def calculate_risk_score(payload):
+    scores = [
+        float(payload.get("loss_reaction", 0.5)),
+        float(payload.get("investment_horizon", 0.5)),
+        float(payload.get("volatility_comfort", 0.5)),
+        float(payload.get("growth_preference", 0.5)),
+    ]
+    return clamp01(sum(scores) / len(scores))
+
+def prepare_bank_data(banka):
+    banka = banka.copy()
+    banka.columns = banka.columns.str.strip()
+    banka = classify_dataframe(banka)
+    banka["Tutar"] = banka["Tutar"].apply(parse_amount)
+    banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce", dayfirst=True)
+    banka["Ay"] = banka["Tarih"].dt.to_period("M")
+    return banka
+
+def compute_fuzzy_inputs(banka, fallback_ozet):
+    gelirler = banka[banka["Tutar"] > 0]
+    giderler = banka[banka["Tutar"] < 0].copy()
+    giderler["Abs"] = giderler["Tutar"].abs()
+
+    toplam_gelir = float(gelirler["Tutar"].sum())
+    zorunlu_gider = float(giderler[giderler["Gider Tipi"] == "Zorunlu"]["Abs"].sum())
+    esneklik = clamp01((toplam_gelir - zorunlu_gider) / toplam_gelir) if toplam_gelir > 0 else 0.0
+
+    aylik_gelir = gelirler.groupby("Ay")["Tutar"].sum()
+    if len(aylik_gelir) >= 2 and float(aylik_gelir.mean()) > 0:
+        duzenlilik = 1 - min(1.0, float(aylik_gelir.std()) / float(aylik_gelir.mean()))
+    elif len(aylik_gelir) == 1:
+        duzenlilik = 0.65
+    else:
+        duzenlilik = 0.0
+
+    profile = load_user_profile()
+    if "risk_tolerance" in profile:
+        risk = float(profile["risk_tolerance"])
+    elif "Risk Tolerans (0-1)" in fallback_ozet:
+        risk = float(fallback_ozet["Risk Tolerans (0-1)"].iloc[0])
+    else:
+        risk = 0.5
+    return clamp01(esneklik), clamp01(duzenlilik), clamp01(risk)
+
 def run_fuzzy():
     # ── CSV Oku ──────────────────────────────────────────────
     ozet  = pd.read_csv(OZET_PATH)
-    banka = pd.read_csv(BANKA_PATH)
     ozet.columns  = ozet.columns.str.strip()
-    banka.columns = banka.columns.str.strip()
-
-    esn  = float(ozet["Esneklik Oranı (0-1)"].iloc[0])
-    duz  = float(ozet["Gelir Düzenlilik Skoru (0-1)"].iloc[0])
-    risk = float(ozet["Risk Tolerans (0-1)"].iloc[0])
+    banka, banka_kaynak = load_bank_data()
 
     # ── Banka Analizi ───────────────────────────────────────
-    banka = classify_dataframe(banka)
-    banka["Tutar"] = banka["Tutar"].apply(parse_amount)
-    banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce")
-    banka["Ay"]    = banka["Tarih"].dt.to_period("M")
+    banka = prepare_bank_data(banka)
+    esn, duz, risk = compute_fuzzy_inputs(banka, ozet)
 
     gelirler = banka[banka["Tutar"] > 0]
     giderler = banka[banka["Tutar"] < 0].copy()
@@ -194,6 +259,7 @@ def run_fuzzy():
         "profil": profil,
         "portfolyo": portfolyolar[profil],
         "banka": {
+            "kaynak": banka_kaynak,
             "toplam_gelir": round(float(banka[banka["Tutar"]>0]["Tutar"].sum()),2),
             "toplam_gider": round(float(banka[banka["Tutar"]<0]["Tutar"].abs().sum()),2),
             "aylik_gelir_ort": round(float(aylik_gelir.mean()),2),
@@ -234,6 +300,43 @@ def index():
 def api_data():
     data = run_fuzzy()
     return jsonify(data)
+
+@app.route("/api/upload-statement", methods=["POST"])
+def upload_statement():
+    uploaded = request.files.get("statement")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"error": "PDF dosyası seçilmedi."}), 400
+    if not uploaded.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Sadece PDF dosyası yüklenebilir."}), 400
+
+    filename = secure_filename(uploaded.filename) or "statement.pdf"
+    pdf_path = os.path.join(UPLOAD_DIR, filename)
+    uploaded.save(pdf_path)
+
+    rows = process_pdf(Path(pdf_path), Path(EXTRACTED_PATH))
+    return jsonify({
+        "ok": True,
+        "transactions": len(rows),
+        "output": os.path.basename(EXTRACTED_PATH),
+    })
+
+@app.route("/api/risk-profile", methods=["GET", "POST"])
+def risk_profile():
+    if request.method == "GET":
+        profile = load_user_profile()
+        return jsonify({
+            "risk_tolerance": round(float(profile.get("risk_tolerance", 0.5)), 4),
+            "answers": profile.get("answers", {}),
+        })
+
+    payload = request.get_json(silent=True) or {}
+    score = calculate_risk_score(payload)
+    profile = {
+        "risk_tolerance": round(score, 4),
+        "answers": {k: clamp01(v) for k, v in payload.items()},
+    }
+    save_user_profile(profile)
+    return jsonify(profile)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
