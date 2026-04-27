@@ -25,4 +25,5 @@ Hesap_Hareketleri_*.pdf
 *.log
 extracted_transactions.csv
 user_profile.json
+last_pdf_name.txt
 uploads/

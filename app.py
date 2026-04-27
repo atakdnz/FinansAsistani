@@ -18,6 +18,7 @@ OZET_PATH  = os.path.join(BASE_DIR, "ozet_hesaplar.csv")
 BANKA_PATH = os.path.join(BASE_DIR, "banka_hareketleri.csv")
 EXTRACTED_PATH = os.path.join(BASE_DIR, "extracted_transactions.csv")
 PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
+PDF_NAME_PATH = os.path.join(BASE_DIR, "last_pdf_name.txt")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -91,7 +92,15 @@ def sanitize_json(value):
 
 def load_bank_data():
     if os.path.exists(EXTRACTED_PATH):
-        return pd.read_csv(EXTRACTED_PATH), "PDF OCR"
+        try:
+            if os.path.exists(PDF_NAME_PATH):
+                with open(PDF_NAME_PATH, encoding="utf-8") as handle:
+                    pdf_name = handle.read().strip()
+            else:
+                pdf_name = "PDF OCR"
+        except OSError:
+            pdf_name = "PDF OCR"
+        return pd.read_csv(EXTRACTED_PATH), pdf_name or "PDF OCR"
     return pd.read_csv(BANKA_PATH), "Demo CSV"
 
 def load_user_profile():
@@ -593,15 +602,34 @@ def run_fuzzy():
          "K16", "Risk=Orta & Vade=Kısa", "Güvenilir"),
         (min(deg_risk["Orta"], deg_esn["Yüksek"], deg_tampon["Güçlü"]), "Dengeli",
          "K17", "Risk=Orta & Esn=Yüksek & Tampon=Güçlü", "Dengeli"),
+        (deg_tampon["Zayıf"], "Güvenilir",
+         "K18", "Tampon=Zayıf", "Güvenilir"),
+        (min(deg_tampon["Zayıf"], deg_esn["Düşük"]), "Güvenilir",
+         "K19", "Tampon=Zayıf & Esn=Düşük", "Güvenilir"),
+        (min(deg_tampon["Orta"], deg_risk["Düşük"]), "Güvenilir",
+         "K20", "Tampon=Orta & Risk=Düşük", "Güvenilir"),
+        (min(deg_esn["Düşük"], deg_duz["Düzensiz"]), "Güvenilir",
+         "K21", "Esn=Düşük & Gel=Düzensiz", "Güvenilir"),
+        (min(deg_esn["Orta"], deg_duz["Düzenli"], deg_vade["Uzun"]), "Dengeli",
+         "K22", "Esn=Orta & Gel=Düzenli & Vade=Uzun", "Dengeli"),
+        (min(deg_borc["Orta"], deg_esn["Düşük"]), "Güvenilir",
+         "K23", "Borç=Orta & Esn=Düşük", "Güvenilir"),
+        (min(deg_borc["Orta"], deg_tampon["Zayıf"]), "Güvenilir",
+         "K24", "Borç=Orta & Tampon=Zayıf", "Güvenilir"),
+        (min(deg_borc["Düşük"], deg_esn["Yüksek"], deg_duz["Düzenli"]), "Dengeli",
+         "K25", "Borç=Düşük & Esn=Yüksek & Gel=Düzenli", "Dengeli"),
     ]
 
-    rules_out = []
-    for akt, label, kid, cond, sonuc in kurallar:
-        rules_out.append({
-            "id": kid, "condition": cond,
-            "conclusion": sonuc, "activation": round(akt, 4),
-            "active": akt > 0.001
-        })
+    rules_out = sorted([
+        {
+            "id": kid,
+            "condition": cond,
+            "conclusion": sonuc,
+            "activation": round(akt, 4),
+            "active": akt > 0.001,
+        }
+        for akt, label, kid, cond, sonuc in kurallar
+    ], key=lambda rule: rule["activation"], reverse=True)
 
     # ── Agregasyon & Defuzz ───────────────────────────────────
     max_g = max(a for a,l,*_ in kurallar if l=="Güvenilir")
@@ -698,6 +726,7 @@ def run_fuzzy():
         "defuzz": round(float(defuzz_val),4),
         "profil": profil,
         "portfolyo": portfolyolar[profil],
+        "tum_portfolyolar": portfolyolar,
         "banka": {
             "kaynak": banka_kaynak,
             "toplam_gelir": round_finite(metrics["toplam_gelir"],2),
@@ -805,9 +834,15 @@ def upload_statement():
     if not uploaded.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Sadece PDF dosyası yüklenebilir."}), 400
 
-    filename = secure_filename(uploaded.filename) or "statement.pdf"
+    original_name = uploaded.filename
+    filename = secure_filename(original_name) or "statement.pdf"
     pdf_path = os.path.join(UPLOAD_DIR, filename)
     uploaded.save(pdf_path)
+    try:
+        with open(PDF_NAME_PATH, "w", encoding="utf-8") as handle:
+            handle.write(original_name)
+    except OSError:
+        pass
 
     rows = process_pdf(Path(pdf_path), Path(EXTRACTED_PATH))
     return jsonify({

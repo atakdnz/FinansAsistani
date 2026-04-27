@@ -22,7 +22,7 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 - `statement_pdf_pipeline.py`: PDF render, PaddleOCR, satir ayrisma ve CSV uretimi.
 - `transaction_classifier.py`: Kural tabanli deterministik islem siniflandirma.
 - `embedding_classifier.py`: Dusuk guvenli kayitlar icin opsiyonel embedding onerisi.
-- `templates/index.html`: PDF yukleme, OCR islem duzeltme tablosu, risk profili ve analiz dashboard'u.
+- `templates/index.html`: PDF yukleme, OCR islem duzeltme tablosu, risk profili, tasarruf simulatoru ve analiz dashboard'u.
 - `PROJECT_OVERVIEW.md`: Ekip icin kod rehberi, mevcut durum ve gelistirme onerileri.
 
 ## Bulanik Mantik Girdileri

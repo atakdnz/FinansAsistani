@@ -249,6 +249,7 @@ Tek sayfalik dashboard:
 - OCR islem kontrol ve manuel duzeltme tablosu.
 - Gelir/gider ozetleri.
 - Siniflandirma ozeti.
+- Tasarruf simulatoru.
 - Fuzzy uyelik grafikleri.
 - Kural aktivasyonlari.
 - Portfoy onerisi.

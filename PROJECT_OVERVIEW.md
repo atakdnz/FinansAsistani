@@ -116,6 +116,7 @@ Kullanici arayuzudur.
 - Onerilen yatirim profili gosterilir.
 - Gelir/gider ozetleri gosterilir.
 - Siniflandirma yontemi ve dusuk guvenli kayit sayisi gosterilir.
+- Tasarruf simulatoru ile gider kismaya gore tahmini birikim etkisi gosterilir.
 - Fuzzy uyelik fonksiyonlari, kurallar, agregasyon ve centroid grafikleri gosterilir.
 - Kategori bazli finansal oneriler gosterilir.
 - Mikro islemler tabloya girmeden ozet olarak gosterilir.
