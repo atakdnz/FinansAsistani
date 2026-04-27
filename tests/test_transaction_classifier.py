@@ -1,7 +1,10 @@
 import unittest
+import os
+import tempfile
 
 import pandas as pd
 
+import app as finance_app
 from transaction_classifier import classify_dataframe, classify_transaction, parse_amount
 
 
@@ -22,6 +25,7 @@ class TransactionClassifierTests(unittest.TestCase):
             ("KREDI YURTLAR KURUMU OGRENIM KREDISI", "4.000,00", "Gelir", "Gelir"),
             ("S/GETIR 1 MUTABAKAT SANAL POS ALISVERIS", "-125,00", "Gıda", "Kısılabilir"),
             ("YEMEKPAY/YEMEK SEPET", "-176,00", "Gıda", "Kısılabilir"),
+            ("ECZANE SAGLIK HARCAMASI", "-240,00", "Sağlık", "Zorunlu"),
         ]
 
         for description, amount, category, expense_type in cases:
@@ -46,6 +50,52 @@ class TransactionClassifierTests(unittest.TestCase):
         self.assertEqual(result.loc[1, "Kategori"], "Diğer")
         self.assertEqual(result.loc[1, "Gider Tipi"], "Belirsiz")
         self.assertIn("Sınıflandırma Kuralı", result.columns)
+
+    def test_transaction_correction_endpoint_accepts_string_amounts(self):
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        old_path = finance_app.EXTRACTED_PATH
+        try:
+            pd.DataFrame(
+                [
+                    {
+                        "Tarih": "26.04.2026",
+                        "Açıklama": "ECZANE",
+                        "Tutar": "-240,00",
+                        "Bakiye": "1.000,00",
+                        "Kategori": "Diğer",
+                        "Gider Tipi": "Belirsiz",
+                        "Sınıflandırma Güveni": 0.35,
+                        "Sınıflandırma Yöntemi": "fallback",
+                        "Sınıflandırma Kuralı": "negative_unknown",
+                    }
+                ]
+            ).to_csv(path, index=False)
+            finance_app.EXTRACTED_PATH = path
+
+            response = finance_app.app.test_client().post(
+                "/api/transactions",
+                json={
+                    "transactions": [
+                        {
+                            "id": 0,
+                            "kategori": "Sağlık",
+                            "gider_tipi": "Zorunlu",
+                            "tutar": "-240,00",
+                        }
+                    ]
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            rows = finance_app.app.test_client().get("/api/transactions").get_json()["transactions"]
+            self.assertEqual(rows[0]["kategori"], "Sağlık")
+            self.assertEqual(rows[0]["gider_tipi"], "Zorunlu")
+            self.assertEqual(rows[0]["yontem"], "manual")
+        finally:
+            finance_app.EXTRACTED_PATH = old_path
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

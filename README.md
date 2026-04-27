@@ -20,7 +20,7 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 - `statement_pdf_pipeline.py`: PDF render, PaddleOCR, satir ayrisma ve CSV uretimi.
 - `transaction_classifier.py`: Kural tabanli deterministik islem siniflandirma.
 - `embedding_classifier.py`: Dusuk guvenli kayitlar icin opsiyonel embedding onerisi.
-- `templates/index.html`: PDF yukleme, risk profili ve analiz dashboard'u.
+- `templates/index.html`: PDF yukleme, OCR islem duzeltme tablosu, risk profili ve analiz dashboard'u.
 - `PROJECT_OVERVIEW.md`: Ekip icin kod rehberi, mevcut durum ve gelistirme onerileri.
 
 ## OCR Normalizasyonu
@@ -36,6 +36,11 @@ Turkce metinler icin PaddleOCR tarafinda `latin_PP-OCRv5_mobile_rec`
 recognition modeli kullanilir. Bu model Latin alfabeli diller arasinda
 Turkce'yi de destekler ve `ÖĞRENİM`, `ALIŞVERİŞ`, `İŞYERİ` gibi kelimelerde
 Ingilizce modele gore daha kararli sonuc verir.
+
+PDF islendikten sonra OCR'dan cikan islemler arayuzde tablo olarak gosterilir.
+Kullanici gerekirse tarih, aciklama, tutar, kategori veya gider tipini
+duzeltebilir. Kaydedilen duzeltmeler `manual` yontemiyle saklanir ve sonraki
+bulanik mantik hesabinda otomatik siniflandirma tarafindan ezilmez.
 
 ## Calistirma
 

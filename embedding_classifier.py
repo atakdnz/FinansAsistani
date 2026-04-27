@@ -45,6 +45,10 @@ CATEGORY_PROTOTYPES = {
         "education school university course stationery online learning",
         "okul universite kurs dershane kirtasiye egitim udemy coursera",
     ],
+    "Sağlık": [
+        "health hospital pharmacy doctor clinic medical dentist",
+        "hastane eczane doktor klinik saglik medikal dis hekimi",
+    ],
     "Borç/Kredi/Kart": [
         "credit card payment loan debt installment card statement payment",
         "kk otomatik odeme kredi karti kart odeme borc kredi taksit",

@@ -12,9 +12,10 @@ Proje artik sadece hazir CSV gosteren bir demo degil. Ana akis su sekilde calisi
 4. OCR satirlari tarih, aciklama, tutar ve bakiye alanlarina ayrilir.
 5. `transaction_classifier.py` aciklama ve tutara gore kategori/gider tipi uretir.
 6. Dusuk guvenli satirlar varsa `embedding_classifier.py` embedding benzerligi ile yardimci kategori onerir.
-7. `app.py` gelir/gider metriklerini, esneklik oranini, gelir duzenliligini ve risk toleransini fuzzy sisteme verir.
-8. Mamdani cikarimi ve centroid durulastirma ile yatirim profili uretilir.
-9. `templates/index.html` sonucu dashboard olarak gosterir.
+7. Kullanici OCR'dan cikan islem satirlarini arayuzden kontrol edip duzeltebilir.
+8. `app.py` gelir/gider metriklerini, esneklik oranini, gelir duzenliligini ve risk toleransini fuzzy sisteme verir.
+9. Mamdani cikarimi ve centroid durulastirma ile yatirim profili uretilir.
+10. `templates/index.html` sonucu dashboard olarak gosterir.
 
 ## Eski Halden Farki
 
@@ -61,6 +62,7 @@ Flask uygulamasinin merkezidir.
 - `/api/data` mevcut banka verisini fuzzy analizden gecirip JSON uretir.
 - `/api/upload-statement` PDF yukler, PaddleOCR pipeline'ini calistirir ve `extracted_transactions.csv` uretir.
 - `/api/risk-profile` risk toleransi cevaplarini kaydeder.
+- `/api/transactions` OCR'dan cikan islem satirlarini listeler ve kullanici duzeltmelerini kaydeder.
 - Fuzzy uyelik fonksiyonlari, Mamdani kurallari, agregasyon ve centroid durulastirma burada calisir.
 
 ### `statement_pdf_pipeline.py`
@@ -121,11 +123,13 @@ Yapildi:
 - PDF yukleme eklendi.
 - PaddleOCR ile PDF'ten veri cikarma eklendi.
 - Gercek hesap dokumu uzerinde satir ayristirma calistirildi.
+- OCR islem kontrol ve manuel duzeltme ekrani eklendi.
 - Kullanici risk toleransi arayuzden alinir hale geldi.
 - Risk toleransi fuzzy sisteme baglandi.
 - Sentetik CSV'ye bagimlilik azaltildi.
 - Deterministik siniflandirma sistemi eklendi.
 - Embedding destekli yardimci siniflandirma eklendi.
+- Saglik kategorisi deterministik ve embedding siniflandirmaya eklendi.
 - `requirements.txt` eklendi.
 - Gereksiz LLM modeli ve eski sanal ortamlar temizlendi.
 - Dashboard'a siniflandirma ozeti eklendi.
@@ -138,10 +142,10 @@ Kismen yapildi:
 
 Henuz yapilmadi:
 
-- Saglik gibi daha fazla kategori eklenmedi.
-- Kural tabani 27 fuzzy kombinasyona genisletilmedi.
+- Fuzzy kural tabani 27 kombinasyona veya daha hedefli 14-18 kurala genisletilmedi.
 - PDF parser farkli banka formatlarina karsi kapsamli test edilmedi.
-- OCR sonucunu kullaniciya satir satir duzeltme ekrani eklenmedi.
+- Kategori bazli detayli tasarruf oneri motoru henuz sinirli.
+- Esneklik disinda tasarruf orani veya kisilabilir gider orani gibi ek fuzzy girdiler henuz eklenmedi.
 - Fuzzy mantik kodu ayri bir servis modulune tasinmadi.
 
 ## Sunumda Nasil Anlatilir?
@@ -164,9 +168,9 @@ Kisa teknik cumle:
    - Ulasim yuksekse yakit/toplu tasima ayrimi yapilabilir.
    - Istege bagli gider yuksekse tasarruf potansiyeli yuzdesi verilebilir.
 
-3. **OCR duzeltme ekrani eklemek**
+3. **OCR duzeltme ekranini demo icin iyilestirmek**
 
-   Kullanici OCR'dan cikan islem listesini gorup kategori veya tutari elle duzeltebilir. Bu demo icin cok guclu gorunur.
+   Mevcut ekran islem satirlarini duzenleyebiliyor. Bir sonraki adimda dusuk guvenli satirlari daha belirgin gostermek, ham OCR satirini tooltip veya detay satiri olarak acmak ve kayit sonrasi daha net geri bildirim vermek iyi olur.
 
 4. **Fuzzy kural tabanini genisletmek**
 

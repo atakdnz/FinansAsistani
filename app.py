@@ -21,6 +21,28 @@ PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+CATEGORY_OPTIONS = [
+    "Gelir",
+    "Banka Ücreti",
+    "Gıda",
+    "Konut/Fatura",
+    "Ulaştırma",
+    "Eğitim",
+    "Sağlık",
+    "Borç/Kredi/Kart",
+    "Alışveriş",
+    "İsteğe Bağlı",
+    "Diğer",
+]
+EXPENSE_TYPE_OPTIONS = ["Gelir", "Zorunlu", "Kısılabilir", "İsteğe Bağlı", "Belirsiz"]
+CLASSIFICATION_COLUMNS = {
+    "Kategori",
+    "Gider Tipi",
+    "Sınıflandırma Güveni",
+    "Sınıflandırma Yöntemi",
+    "Sınıflandırma Kuralı",
+}
+
 # ── Üyelik fonksiyon yardımcısı ──────────────────────────────
 x = np.linspace(0, 1, 1000)
 y = np.linspace(0, 1, 1000)
@@ -66,11 +88,34 @@ def calculate_risk_score(payload):
 def prepare_bank_data(banka):
     banka = banka.copy()
     banka.columns = banka.columns.str.strip()
-    banka = classify_dataframe(banka)
+    if not CLASSIFICATION_COLUMNS.issubset(set(banka.columns)):
+        banka = classify_dataframe(banka)
     banka["Tutar"] = banka["Tutar"].apply(parse_amount)
     banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce", dayfirst=True)
     banka["Ay"] = banka["Tarih"].dt.to_period("M")
     return banka
+
+def _raw_transaction_rows():
+    if not os.path.exists(EXTRACTED_PATH):
+        return []
+    df = pd.read_csv(EXTRACTED_PATH)
+    df.columns = df.columns.str.strip()
+    rows = []
+    for idx, row in df.iterrows():
+        rows.append({
+            "id": int(idx),
+            "tarih": str(row.get("Tarih", "")),
+            "aciklama": str(row.get("Açıklama", "")),
+            "tutar": parse_amount(row.get("Tutar", 0)),
+            "bakiye": None if pd.isna(row.get("Bakiye", None)) else parse_amount(row.get("Bakiye", 0)),
+            "kategori": str(row.get("Kategori", "Diğer")),
+            "gider_tipi": str(row.get("Gider Tipi", "Belirsiz")),
+            "guven": float(row.get("Sınıflandırma Güveni", 0) or 0),
+            "yontem": str(row.get("Sınıflandırma Yöntemi", "")),
+            "kural": str(row.get("Sınıflandırma Kuralı", "")),
+            "ham_ocr": str(row.get("Ham OCR Satırı", "")),
+        })
+    return rows
 
 def compute_fuzzy_inputs(banka, fallback_ozet):
     gelirler = banka[banka["Tutar"] > 0]
@@ -252,6 +297,7 @@ def run_fuzzy():
 
     return {
         "inputs": {"esneklik": round(esn,4), "duzenlilik": round(duz,4), "risk": round(risk,4)},
+        "options": {"categories": CATEGORY_OPTIONS, "expense_types": EXPENSE_TYPE_OPTIONS},
         "mf_charts": mf_charts,
         "output_chart": output_chart,
         "rules": rules_out,
@@ -288,7 +334,8 @@ def run_fuzzy():
                 "gelir": monthly_gelir,
                 "gider": monthly_gider,
                 "tasarruf": monthly_tas
-            }
+            },
+            "transactions": _raw_transaction_rows()[:100]
         }
     }
 
@@ -300,6 +347,48 @@ def index():
 def api_data():
     data = run_fuzzy()
     return jsonify(data)
+
+@app.route("/api/transactions", methods=["GET", "POST"])
+def transactions():
+    if request.method == "GET":
+        return jsonify({
+            "transactions": _raw_transaction_rows(),
+            "categories": CATEGORY_OPTIONS,
+            "expense_types": EXPENSE_TYPE_OPTIONS,
+        })
+
+    if not os.path.exists(EXTRACTED_PATH):
+        return jsonify({"error": "Düzenlenecek OCR işlemi bulunamadı."}), 404
+
+    payload = request.get_json(silent=True) or {}
+    updates = payload.get("transactions", [])
+    update_by_id = {int(item["id"]): item for item in updates if "id" in item}
+    df = pd.read_csv(EXTRACTED_PATH)
+    df.columns = df.columns.str.strip()
+    if "Tutar" in df.columns:
+        df["Tutar"] = df["Tutar"].apply(parse_amount)
+    if "Bakiye" in df.columns:
+        df["Bakiye"] = df["Bakiye"].apply(lambda value: None if pd.isna(value) else parse_amount(value))
+
+    for idx, update in update_by_id.items():
+        if idx < 0 or idx >= len(df):
+            continue
+        if "tarih" in update:
+            df.at[idx, "Tarih"] = str(update["tarih"])
+        if "aciklama" in update:
+            df.at[idx, "Açıklama"] = str(update["aciklama"])
+        if "tutar" in update:
+            df.at[idx, "Tutar"] = parse_amount(update["tutar"])
+        if "kategori" in update and update["kategori"] in CATEGORY_OPTIONS:
+            df.at[idx, "Kategori"] = update["kategori"]
+        if "gider_tipi" in update and update["gider_tipi"] in EXPENSE_TYPE_OPTIONS:
+            df.at[idx, "Gider Tipi"] = update["gider_tipi"]
+        df.at[idx, "Sınıflandırma Yöntemi"] = "manual"
+        df.at[idx, "Sınıflandırma Kuralı"] = "user_correction"
+        df.at[idx, "Sınıflandırma Güveni"] = 1.0
+
+    df.to_csv(EXTRACTED_PATH, index=False, encoding="utf-8-sig")
+    return jsonify({"ok": True, "transactions": len(df)})
 
 @app.route("/api/upload-statement", methods=["POST"])
 def upload_statement():

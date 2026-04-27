@@ -145,6 +145,9 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
     ):
         return _result("Gıda", "Kısılabilir", 0.90, "rule", "food_merchant", normalized)
 
+    if _contains_any(normalized, ("HASTANE", "ECZANE", "DOKTOR", "KLINIK", "SAGLIK", "MEDIKAL", "DIS HEKIMI")):
+        return _result("Sağlık", "Zorunlu", 0.86, "rule", "health", normalized)
+
     if _contains_any(
         normalized,
         (
