@@ -66,7 +66,9 @@ Yeni 6 girdili fuzzy degisiklikleri:
 - Yatirim vadesi risk toleransi ortalamasindan ayrildi.
 - Acil durum tamponu hesap dokumundeki bakiye ve zorunlu giderden hesaplandi.
 - Borc yuku orani kredi/kart/borc odemeleri uzerinden hesaplandi.
-- Kural tabani 15 hedefli Mamdani kuralina cikti.
+- Kural tabani 17 hedefli Mamdani kuralina cikti.
+- 10 TL ve altindaki mikro tahsilatlar analiz ve arayuz listesinden ayrildi.
+- Kategori bazli oneri kartlari eklendi.
 
 ## Calisma Ortami
 
@@ -178,6 +180,8 @@ Flask uygulamasi. Endpointler:
 - `/api/upload-statement`: PDF yukler, OCR pipeline'i calistirir, `extracted_transactions.csv` uretir.
 - `/api/risk-profile`: kullanici risk cevaplarini kaydeder/okur.
 - `/api/transactions`: OCR islemlerini listeler ve manuel duzeltmeleri kaydeder.
+- `calculate_financial_metrics`: mikro islemleri ayirir, 6 fuzzy girdiye kaynak olan metrikleri hesaplar.
+- `build_category_recommendations`: borc, gida/alisveris, banka ucreti, tampon ve tasarruf sinyallerinden oneri kartlari uretir.
 
 Fuzzy sistem su anda 6 girdi kullanir:
 
@@ -188,7 +192,9 @@ Fuzzy sistem su anda 6 girdi kullanir:
 - `tampon`: son bakiye / aylik ortalama zorunlu gider uzerinden acil durum tamponu.
 - `borc`: borc/kredi/kart odemeleri / toplam gelir.
 
-Kural tabani su anda 15 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
+Kural tabani su anda 17 hedefli Mamdani kuralidir. Uzun vade tek basina agresif profil uretmez; risk, esneklik, tampon ve borc yuku ile birlikte degerlendirilir.
+
+10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar ham CSV'de kalir, ama dashboard islem tablosunda gosterilmez ve toplam gider, kategori dagilimi, aylik trend, fuzzy girdi hesaplari ve kategori onerilerini etkilemez.
 
 ### `statement_pdf_pipeline.py`
 
@@ -235,6 +241,8 @@ Tek sayfalik dashboard:
 - Fuzzy uyelik grafikleri.
 - Kural aktivasyonlari.
 - Portfoy onerisi.
+- Kategori bazli oneri kartlari.
+- Mikro islem ozeti.
 
 ### `README.md`
 
@@ -273,11 +281,10 @@ Bu iki metrik su an dashboard/gelecek oneri motoru icin anlamli adaylardir; ana 
 
 Zorunlu olmayan ama projeyi guclendirecek alanlar:
 
-1. Kategori bazli tasarruf onerileri uretmek.
-2. Mikro banka tahsilatlarini analiz etkisinden ayri tutmak.
-3. OCR duzeltme ekraninda dusuk guvenli satirlari vurgulamak.
-4. Fuzzy kural agirliklarini daha fazla senaryoyla ince ayar yapmak.
-5. Fuzzy hesaplamayi `app.py` icinden ayri bir servis modulune tasimak.
+1. Kategori bazli onerilerin metinlerini ve esiklerini daha fazla ornekle iyilestirmek.
+2. OCR duzeltme ekraninda dusuk guvenli satirlari vurgulamak.
+3. Fuzzy kural agirliklarini daha fazla senaryoyla ince ayar yapmak.
+4. Fuzzy hesaplamayi `app.py` icinden ayri bir servis modulune tasimak.
 
 Farkli banka PDF'i bulmak zor olabilir; bu ders projesi icin sart degil. Mevcut akisin tek banka dokumunde stabil calismasi daha onemli.
 
@@ -371,14 +378,9 @@ Etkisi:
 
 En mantikli sonraki teknik adim:
 
-1. Kategori bazli basit oneri motoru ekle:
-   - Gida yuksekse market/restoran ayrimi ve azaltma onerisi.
-   - Istegi bagli yuksekse abonelik/eglence onerisi.
-   - Banka ucreti yuksekse EFT/FAST/hesap paketi onerisi.
-   - Borc/Kredi/Kart yuksekse borc yukunu azaltma onerisi.
-2. Mikro BSMV/komisyon gibi cok kucuk islemleri toplam analiz etkisinden ayir.
-3. Frontend'deki ders anlatimi gibi duran bolumleri sade bir demo akisi haline getir.
-4. Fuzzy hesaplamayi ayri servis modulune tasiyarak `app.py` dosyasini sadeleştir.
+1. Frontend'deki ders anlatimi gibi duran bolumleri sade bir demo akisi haline getir.
+2. Kategori onerilerini daha net, daha az kalabalik ve demo odakli hale getir.
+3. Fuzzy hesaplamayi ayri servis modulune tasiyarak `app.py` dosyasini sadeleştir.
 
 ## Dikkat Edilecek Noktalar
 

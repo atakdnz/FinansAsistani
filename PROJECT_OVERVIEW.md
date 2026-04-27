@@ -13,9 +13,10 @@ Proje artik sadece hazir CSV gosteren bir demo degil. Ana akis su sekilde calisi
 5. `transaction_classifier.py` aciklama ve tutara gore kategori/gider tipi uretir.
 6. Dusuk guvenli satirlar varsa `embedding_classifier.py` embedding benzerligi ile yardimci kategori onerir.
 7. Kullanici OCR'dan cikan islem satirlarini arayuzden kontrol edip duzeltebilir.
-8. `app.py` gelir duzenliligi, esneklik, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yukunu fuzzy sisteme verir.
-9. Mamdani cikarimi ve centroid durulastirma ile yatirim profili uretilir.
-10. `templates/index.html` sonucu dashboard olarak gosterir.
+8. `app.py` 10 TL ve altindaki mikro tahsilatlari analiz ve arayuz listesinden ayirir.
+9. `app.py` gelir duzenliligi, esneklik, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yukunu fuzzy sisteme verir.
+10. Mamdani cikarimi ve centroid durulastirma ile yatirim profili uretilir.
+11. Kategori bazli finansal oneriler dashboard'da gosterilir.
 
 ## Eski Halden Farki
 
@@ -64,6 +65,8 @@ Flask uygulamasinin merkezidir.
 - `/api/risk-profile` risk toleransi cevaplarini kaydeder.
 - `/api/transactions` OCR'dan cikan islem satirlarini listeler ve kullanici duzeltmelerini kaydeder.
 - Fuzzy uyelik fonksiyonlari, Mamdani kurallari, agregasyon ve centroid durulastirma burada calisir.
+- 10 TL ve altindaki mikro tahsilatlari ham veride tutar ama analiz ve tablo gosteriminden ayirir.
+- Kategori bazli onerileri `build_category_recommendations` ile uretir.
 
 ### `statement_pdf_pipeline.py`
 
@@ -108,6 +111,8 @@ Kullanici arayuzudur.
 - Gelir/gider ozetleri gosterilir.
 - Siniflandirma yontemi ve dusuk guvenli kayit sayisi gosterilir.
 - Fuzzy uyelik fonksiyonlari, kurallar, agregasyon ve centroid grafikleri gosterilir.
+- Kategori bazli finansal oneriler gosterilir.
+- Mikro islemler tabloya girmeden ozet olarak gosterilir.
 
 ### `bankdataset.py`
 
@@ -129,7 +134,9 @@ Yapildi:
 - Risk toleransi fuzzy sisteme baglandi.
 - Yatirim vadesi risk toleransi ortalamasindan ayrilip bagimsiz fuzzy girdi yapildi.
 - Acil durum tamponu ve borc yuku hesap dokumunden hesaplanip fuzzy sisteme eklendi.
-- Fuzzy kural tabani 6 girdi kullanan 15 hedefli Mamdani kuralina genisletildi.
+- Fuzzy kural tabani 6 girdi kullanan 17 hedefli Mamdani kuralina genisletildi.
+- 10 TL ve altindaki mikro islemler analiz ve arayuz listesinden ayrildi.
+- Kategori bazli oneri kartlari eklendi.
 - Sentetik CSV'ye bagimlilik azaltildi.
 - Deterministik siniflandirma sistemi eklendi.
 - Embedding destekli yardimci siniflandirma eklendi.
@@ -147,15 +154,14 @@ Kismen yapildi:
 Henuz yapilmadi:
 
 - PDF parser farkli banka formatlarina karsi kapsamli test edilmedi.
-- Kategori bazli detayli tasarruf oneri motoru henuz sinirli.
-- Mikro banka tahsilatlarini analiz etkisinden ayri tutma henuz eklenmedi.
+- Kategori bazli oneri motoru var, ama metinler ve esikler daha fazla ornekle iyilestirilebilir.
 - Fuzzy mantik kodu ayri bir servis modulune tasinmadi.
 
 ## Sunumda Nasil Anlatilir?
 
 Kisa teknik cumle:
 
-> Sistem, kullanicinin yukledigi banka PDF'ini PaddleOCR ile okuyarak islem satirlarina ayirir. Islemler once kural tabanli deterministik siniflandirici ile kategorize edilir. Belirsiz islemler icin embedding tabanli benzerlik modeli yardimci karar mekanizmasi olarak kullanilir. Sonrasinda gelir duzenliligi, esneklik orani, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yuku 15 kuralli Mamdani bulanik cikarim sistemine verilerek yatirim profili olusturulur.
+> Sistem, kullanicinin yukledigi banka PDF'ini PaddleOCR ile okuyarak islem satirlarina ayirir. Islemler once kural tabanli deterministik siniflandirici ile kategorize edilir. 10 TL ve altindaki mikro tahsilatlar analizden ayrilir. Belirsiz islemler icin embedding tabanli benzerlik modeli yardimci karar mekanizmasi olarak kullanilir. Sonrasinda gelir duzenliligi, esneklik orani, risk toleransi, yatirim vadesi, acil durum tamponu ve borc yuku Mamdani bulanik cikarim sistemine verilerek yatirim profili ve kategori bazli oneriler olusturulur.
 
 ## Mantikli Sonraki Gelistirmeler
 
@@ -163,9 +169,9 @@ Kisa teknik cumle:
 
    Daha fazla merchant ve banka terimi eklenebilir. Ozellikle saglik, egitim, abonelik, market, e-ticaret, ulasim ve fatura kaliplari genisletilebilir.
 
-2. **Gider oneri motoru eklemek**
+2. **Gider oneri motorunu iyilestirmek**
 
-   Kategori toplamlarina gore kisa oneriler uretilebilir:
+   Kategori toplamlarina gore kisa oneriler uretiliyor. Ileride su ayrimlar daha detayli hale getirilebilir:
 
    - Gida harcamasi yuksekse market/yemek disi ayrimi yapilabilir.
    - Ulasim yuksekse yakit/toplu tasima ayrimi yapilabilir.
@@ -177,7 +183,7 @@ Kisa teknik cumle:
 
 4. **Fuzzy kural tabanini genisletmek**
 
-   Su an 6 girdiyi kullanan 15 hedefli kural var. Ileride kural agirliklari daha fazla ornek senaryoyla test edilip ince ayar yapilabilir.
+   Su an 6 girdiyi kullanan 17 hedefli kural var. Ileride kural agirliklari daha fazla ornek senaryoyla test edilip ince ayar yapilabilir.
 
 5. **Portfoy dagilimini daha aciklanabilir yapmak**
 

@@ -42,6 +42,7 @@ CLASSIFICATION_COLUMNS = {
     "Sınıflandırma Yöntemi",
     "Sınıflandırma Kuralı",
 }
+MICRO_TRANSACTION_LIMIT = 10.0
 
 # ── Üyelik fonksiyon yardımcısı ──────────────────────────────
 x = np.linspace(0, 1, 1000)
@@ -104,10 +105,24 @@ def fallback_risk_score(fallback_ozet):
         return clamp01(float(fallback_ozet["Risk Tolerans (0-1)"].iloc[0]))
     return 0.5
 
+def _micro_transaction_mask(df):
+    if "Tutar" not in df.columns:
+        return pd.Series(False, index=df.index)
+    amounts = df["Tutar"].apply(parse_amount)
+    return (amounts < 0) & (amounts.abs() <= MICRO_TRANSACTION_LIMIT)
+
 def calculate_financial_metrics(banka):
-    gelirler = banka[banka["Tutar"] > 0]
-    giderler = banka[banka["Tutar"] < 0].copy()
+    banka = banka.copy()
+    banka["Tutar"] = banka["Tutar"].apply(parse_amount)
+    micro_mask = _micro_transaction_mask(banka)
+    mikro_islemler = banka[micro_mask].copy()
+    analiz_banka = banka[~micro_mask].copy()
+
+    gelirler = analiz_banka[analiz_banka["Tutar"] > 0]
+    giderler = analiz_banka[analiz_banka["Tutar"] < 0].copy()
     giderler["Abs"] = giderler["Tutar"].abs()
+    if not mikro_islemler.empty:
+        mikro_islemler["Abs"] = mikro_islemler["Tutar"].abs()
 
     toplam_gelir = float(gelirler["Tutar"].sum())
     toplam_gider = float(giderler["Abs"].sum())
@@ -149,8 +164,12 @@ def calculate_financial_metrics(banka):
         acil_tampon = 0.5
 
     return {
+        "analiz_banka": analiz_banka,
         "gelirler": gelirler,
         "giderler": giderler,
+        "mikro_islemler": mikro_islemler,
+        "mikro_adedi": int(len(mikro_islemler)),
+        "mikro_toplam": float(mikro_islemler["Abs"].sum()) if not mikro_islemler.empty else 0.0,
         "toplam_gelir": toplam_gelir,
         "toplam_gider": toplam_gider,
         "zorunlu_gider": zorunlu_gider,
@@ -167,6 +186,86 @@ def calculate_financial_metrics(banka):
         "aylik_gider": aylik_gider,
         "aylik_tasarruf": aylik_tasarruf,
     }
+
+def build_category_recommendations(metrics, kat_gider):
+    recommendations = []
+    toplam_gider = float(metrics["toplam_gider"])
+    toplam_gelir = float(metrics["toplam_gelir"])
+
+    if metrics["mikro_adedi"]:
+        recommendations.append({
+            "title": "Mikro işlemler analiz dışı",
+            "detail": f"{MICRO_TRANSACTION_LIMIT:.0f} TL ve altındaki {metrics['mikro_adedi']} küçük tahsilat toplamları ve grafikleri etkilemiyor.",
+            "level": "info",
+        })
+
+    if metrics["borc_yuku"] >= 0.30:
+        recommendations.append({
+            "title": "Borç yükü yüksek",
+            "detail": "Kredi veya kart ödemeleri gelirin önemli bölümünü kullanıyor; agresif yatırım yerine borç yükünü azaltmak öncelikli olabilir.",
+            "level": "warning",
+        })
+    elif metrics["borc_yuku"] >= 0.15:
+        recommendations.append({
+            "title": "Borç yükü izlenmeli",
+            "detail": "Borç/kredi/kart ödemeleri orta seviyede. Düzenli ödeme korunursa dengeli portföy daha savunulabilir olur.",
+            "level": "info",
+        })
+
+    gida = float(kat_gider.get("Gıda", 0.0)) if not kat_gider.empty else 0.0
+    if toplam_gider > 0 and gida / toplam_gider >= 0.25:
+        recommendations.append({
+            "title": "Gıda harcaması öne çıkıyor",
+            "detail": "Paket yemek, kahve ve dışarıda yemek kalemleri azaltılabilir harcama olarak izlenebilir.",
+            "level": "saving",
+        })
+
+    istege_bagli = float(kat_gider.get("İsteğe Bağlı", 0.0)) if not kat_gider.empty else 0.0
+    alisveris = float(kat_gider.get("Alışveriş", 0.0)) if not kat_gider.empty else 0.0
+    esnek_tutar = float(metrics["esnek_gider"])
+    if toplam_gider > 0 and (esnek_tutar + istege_bagli + alisveris) / toplam_gider >= 0.30:
+        recommendations.append({
+            "title": "Tasarruf alanı var",
+            "detail": "Kısılabilir ve isteğe bağlı harcamalar yüksek. Bu kalemlerde küçük kesintiler yatırım bütçesini artırabilir.",
+            "level": "saving",
+        })
+
+    banka_ucreti = float(kat_gider.get("Banka Ücreti", 0.0)) if not kat_gider.empty else 0.0
+    if banka_ucreti >= 50:
+        recommendations.append({
+            "title": "Banka ücretleri kontrol edilmeli",
+            "detail": "Komisyon ve işlem ücretleri belirginleşmiş. EFT/FAST limitleri veya hesap paketi kontrol edilebilir.",
+            "level": "info",
+        })
+
+    if metrics["tampon_ay"] is not None:
+        if metrics["tampon_ay"] < 1:
+            recommendations.append({
+                "title": "Acil durum tamponu zayıf",
+                "detail": "Zorunlu giderleri karşılayacak nakit tampon düşük. Yatırımdan önce kısa vadeli nakit rezervi güçlendirilebilir.",
+                "level": "warning",
+            })
+        elif metrics["tampon_ay"] >= 3:
+            recommendations.append({
+                "title": "Acil durum tamponu güçlü",
+                "detail": "Mevcut bakiye zorunlu giderlere göre güçlü görünüyor; risk ve vade uygunsa yatırım alanı oluşuyor.",
+                "level": "positive",
+            })
+
+    if toplam_gelir > 0 and metrics["tasarruf_orani"] >= 0.20:
+        recommendations.append({
+            "title": "Tasarruf oranı sağlıklı",
+            "detail": "Gelire göre net birikim pozitif. Bu düzen korunursa portföy önerisi daha sürdürülebilir olur.",
+            "level": "positive",
+        })
+
+    if not recommendations:
+        recommendations.append({
+            "title": "Belirgin risk sinyali yok",
+            "detail": "Bu dökümde kategori bazlı büyük bir sapma görünmüyor. Daha fazla aylık veriyle öneriler keskinleşir.",
+            "level": "info",
+        })
+    return recommendations[:5]
 
 def compute_fuzzy_inputs(banka, fallback_ozet):
     metrics = calculate_financial_metrics(banka)
@@ -207,11 +306,13 @@ def prepare_bank_data(banka):
     banka["Ay"] = banka["Tarih"].dt.to_period("M")
     return banka
 
-def _raw_transaction_rows():
+def _raw_transaction_rows(include_micro=False):
     if not os.path.exists(EXTRACTED_PATH):
         return []
     df = pd.read_csv(EXTRACTED_PATH)
     df.columns = df.columns.str.strip()
+    if not include_micro:
+        df = df[~_micro_transaction_mask(df)].copy()
     rows = []
     for idx, row in df.iterrows():
         rows.append({
@@ -246,12 +347,14 @@ def run_fuzzy():
     borc = inputs["borc"]
 
     giderler = metrics["giderler"]
+    analiz_banka = metrics["analiz_banka"]
     aylik_gelir = metrics["aylik_gelir"]
     aylik_gider = metrics["aylik_gider"]
     aylik_tasarruf = metrics["aylik_tasarruf"]
 
     kat_gider = giderler.groupby("Kategori")["Abs"].sum().sort_values(ascending=False)
-    dusuk_guven = banka[banka["Sınıflandırma Güveni"] < 0.50].copy()
+    recommendations = build_category_recommendations(metrics, kat_gider)
+    dusuk_guven = analiz_banka[analiz_banka["Sınıflandırma Güveni"] < 0.50].copy()
 
     # Aylık trend için ay bazında gelir/gider
     aylar = sorted(set(list(aylik_gelir.index) + list(aylik_gider.index)))
@@ -339,6 +442,10 @@ def run_fuzzy():
          "K14", "Risk=Yüksek & Vade=Orta & Esn=Yüksek & Tampon=Güçlü & Borç=Düşük", "Agresif"),
         (min(deg_risk["Yüksek"], deg_vade["Uzun"], deg_borc["Orta"], deg_tampon["Güçlü"]), "Dengeli",
          "K15", "Risk=Yüksek & Vade=Uzun & Borç=Orta & Tampon=Güçlü", "Dengeli"),
+        (min(deg_risk["Orta"], deg_vade["Kısa"]), "Güvenilir",
+         "K16", "Risk=Orta & Vade=Kısa", "Güvenilir"),
+        (min(deg_risk["Orta"], deg_esn["Yüksek"], deg_tampon["Güçlü"]), "Dengeli",
+         "K17", "Risk=Orta & Esn=Yüksek & Tampon=Güçlü", "Dengeli"),
     ]
 
     rules_out = []
@@ -458,10 +565,17 @@ def run_fuzzy():
             "tasarruf_orani": round(float(metrics["tasarruf_orani"]),4),
             "kisilabilir_oran": round(float(metrics["kisilabilir_oran"]),4),
             "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
+            "oneriler": recommendations,
+            "mikro_islem": {
+                "esik": MICRO_TRANSACTION_LIMIT,
+                "adet": int(metrics["mikro_adedi"]),
+                "toplam": round(float(metrics["mikro_toplam"]), 2),
+            },
             "siniflandirma": {
                 "toplam": int(len(banka)),
+                "analiz_adedi": int(len(analiz_banka)),
                 "dusuk_guven_adedi": int(len(dusuk_guven)),
-                "yontemler": {k: int(v) for k, v in banka["Sınıflandırma Yöntemi"].value_counts().items()},
+                "yontemler": {k: int(v) for k, v in analiz_banka["Sınıflandırma Yöntemi"].value_counts().items()},
                 "dusuk_guven_ornekleri": [
                     {
                         "tarih": "" if pd.isna(row["Tarih"]) else str(row["Tarih"].date()),
@@ -480,7 +594,7 @@ def run_fuzzy():
                 "gider": monthly_gider,
                 "tasarruf": monthly_tas
             },
-            "transactions": _raw_transaction_rows()[:100]
+            "transactions": _raw_transaction_rows(include_micro=False)[:100]
         }
     }
 
@@ -497,7 +611,7 @@ def api_data():
 def transactions():
     if request.method == "GET":
         return jsonify({
-            "transactions": _raw_transaction_rows(),
+            "transactions": _raw_transaction_rows(include_micro=False),
             "categories": CATEGORY_OPTIONS,
             "expense_types": EXPENSE_TYPE_OPTIONS,
         })

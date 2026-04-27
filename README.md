@@ -10,9 +10,11 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 4. OCR satirlari tarih, aciklama, tutar ve bakiye alanlarina ayrilir.
 5. Deterministik siniflandirici aciklama ve tutara gore kategori/gider tipi atar.
 6. Dusuk guvenli kayitlar icin embedding tabanli yardimci sinyal kullanilir.
-7. Gelir duzenliligi, esneklik, acil durum tamponu ve borc yuku hesaplanir.
-8. Kullanici risk toleransi ve yatirim vadesi sliderlarini doldurur.
-9. 6 girdili Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
+7. 10 TL ve altindaki mikro tahsilatlar analiz ve arayuz listesinden ayrilir.
+8. Gelir duzenliligi, esneklik, acil durum tamponu ve borc yuku hesaplanir.
+9. Kullanici risk toleransi ve yatirim vadesi sliderlarini doldurur.
+10. 6 girdili Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
+11. Kategori bazli kisa finansal oneriler uretilir.
 
 ## Ana Bilesenler
 
@@ -38,6 +40,16 @@ Risk toleransi kullanicinin kayip ve dalgalanmaya psikolojik dayanimi olarak
 hesaplanir. Yatirim vadesi ayri girdi olarak tutulur; uzun vade tek basina
 agresif profil uretmez, sadece risk toleransi ve finansal tampon uygunsa daha
 dalgali portfoylere alan acar.
+
+## Mikro Islemler ve Oneriler
+
+10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar
+ham CSV'de kalir, ancak dashboard islem tablosunda gosterilmez ve toplam gider,
+kategori dagilimi, fuzzy girdiler ve aylik trend hesaplarini etkilemez.
+
+Dashboard ayrica kategori bazli oneriler uretir. Borc yuku, gida/alisveris
+agirligi, banka ucretleri, acil durum tamponu ve tasarruf orani gibi sinyaller
+kisa oneri kartlarina donusturulur.
 
 ## OCR Normalizasyonu
 

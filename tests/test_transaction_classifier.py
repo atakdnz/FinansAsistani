@@ -135,6 +135,14 @@ class TransactionClassifierTests(unittest.TestCase):
                     "Bakiye": 12000.0,
                     "Ay": pd.Period("2026-04"),
                 },
+                {
+                    "Tarih": pd.Timestamp("2026-04-05"),
+                    "Tutar": -4.0,
+                    "Kategori": "Banka Ücreti",
+                    "Gider Tipi": "Zorunlu",
+                    "Bakiye": 11996.0,
+                    "Ay": pd.Period("2026-04"),
+                },
             ]
         )
 
@@ -142,7 +150,54 @@ class TransactionClassifierTests(unittest.TestCase):
 
         self.assertAlmostEqual(metrics["borc_yuku"], 0.2)
         self.assertAlmostEqual(metrics["esneklik"], 0.8)
+        self.assertAlmostEqual(metrics["toplam_gider"], 3000.0)
+        self.assertEqual(metrics["mikro_adedi"], 1)
+        self.assertEqual(metrics["mikro_toplam"], 4.0)
         self.assertEqual(metrics["acil_tampon"], 1.0)
+
+    def test_raw_transaction_rows_hide_micro_transactions(self):
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        old_path = finance_app.EXTRACTED_PATH
+        try:
+            pd.DataFrame(
+                [
+                    {
+                        "Tarih": "26.04.2026",
+                        "Açıklama": "BSMV",
+                        "Tutar": "-0,20",
+                        "Bakiye": "1.000,00",
+                        "Kategori": "Banka Ücreti",
+                        "Gider Tipi": "Zorunlu",
+                        "Sınıflandırma Güveni": 0.95,
+                        "Sınıflandırma Yöntemi": "rule",
+                        "Sınıflandırma Kuralı": "bank_fee",
+                    },
+                    {
+                        "Tarih": "26.04.2026",
+                        "Açıklama": "MARKET",
+                        "Tutar": "-240,00",
+                        "Bakiye": "760,00",
+                        "Kategori": "Gıda",
+                        "Gider Tipi": "Kısılabilir",
+                        "Sınıflandırma Güveni": 0.9,
+                        "Sınıflandırma Yöntemi": "rule",
+                        "Sınıflandırma Kuralı": "food_merchant",
+                    },
+                ]
+            ).to_csv(path, index=False)
+            finance_app.EXTRACTED_PATH = path
+
+            visible_rows = finance_app._raw_transaction_rows()
+            all_rows = finance_app._raw_transaction_rows(include_micro=True)
+
+            self.assertEqual(len(visible_rows), 1)
+            self.assertEqual(visible_rows[0]["aciklama"], "MARKET")
+            self.assertEqual(len(all_rows), 2)
+        finally:
+            finance_app.EXTRACTED_PATH = old_path
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":
