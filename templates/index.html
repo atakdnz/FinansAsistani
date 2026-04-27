@@ -50,6 +50,10 @@ header { margin-bottom: 36px; padding-bottom: 28px; border-bottom: 2px solid var
 .drop-zone h3 { font-family: 'Playfair Display',serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
 .drop-zone p { font-size: 12px; color: var(--text2); }
 #fileInput { display: none; }
+.input-strip { display: grid; grid-template-columns: minmax(320px,.9fr) minmax(360px,1.1fr); gap: 16px; align-items: stretch; margin-bottom: 16px; }
+.input-strip .upload-section { margin-bottom: 0; height: 100%; }
+.profile-input-shell { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+@media (max-width: 900px) { .input-strip { grid-template-columns: 1fr; } }
 
 /* Panels & Cards */
 .panel { background: var(--surface); border: 1px solid var(--border); padding: 20px; margin-bottom: 16px; }
@@ -292,16 +296,22 @@ canvas { max-width: 100%; }
   </div>
 </div>
 
-<!-- Upload alanı -->
-<div class="upload-section" style="margin-bottom:16px">
-  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <div class="drop-zone-icon">📄</div>
-    <h3>Banka Ekstrenizi Yükleyin</h3>
-    <p>PDF dosyasını buraya sürükleyin veya tıklayın</p>
+<div class="input-strip">
+  <!-- Upload alanı -->
+  <div class="upload-section">
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-zone-icon">📄</div>
+      <h3>Banka Ekstrenizi Yükleyin</h3>
+      <p>PDF dosyasını buraya sürükleyin veya tıklayın</p>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf">
+    <div id="fileName" style="margin-top:10px;font-size:12px;color:var(--text2);display:none"></div>
+    <button class="btn" id="uploadBtn" style="margin-top:14px" disabled>▶ PDF İşle & Analiz Et</button>
   </div>
-  <input type="file" id="fileInput" accept=".pdf">
-  <div id="fileName" style="margin-top:10px;font-size:12px;color:var(--text2);display:none"></div>
-  <button class="btn" id="uploadBtn" style="margin-top:14px" disabled>▶ PDF İşle & Analiz Et</button>
+  <div id="profileInputArea" class="profile-input-shell">
+    <div class="card-title">Risk Tercihiniz</div>
+    <div class="stat-sub">Veriler yükleniyor...</div>
+  </div>
 </div>
 
 <!-- Sistem İşleyişi: yatay akış -->
@@ -447,6 +457,7 @@ async function saveRiskProfile(){
   const values = Object.fromEntries([...document.querySelectorAll('[data-risk]')].map(input=>[
     input.dataset.risk, Number(input.value)
   ]));
+  const originalBtnText = btn?.textContent || 'Profilimi Güncelle';
   if(btn){ btn.disabled = true; btn.textContent = 'Hesaplanıyor...'; }
   status.textContent = '';
   try{
@@ -458,13 +469,14 @@ async function saveRiskProfile(){
     const rtLabel = riskLevels.find(l=>payload.risk_tolerance<l.max);
     const ihLabel = horizonLevels.find(l=>payload.investment_horizon<l.max);
     status.innerHTML = `<span style="color:var(--safe);font-weight:600">✓ Profil kaydedildi</span> — Risk: <strong>${rtLabel?.label||'—'}</strong> · Vade: <strong>${ihLabel?.label||'—'}</strong>`;
-    if(btn){ btn.disabled = false; btn.textContent = 'Profilimi Hesapla & Kaydet'; }
-    // Sadece sonuç bölümünü güncelle, tüm sayfayı yeniden çizme
+    if(btn){ btn.disabled = false; btn.textContent = originalBtnText; }
     const data = await loadData();
-    updateFuzzyResult(data);
+    render(data);
+    const nextStatus = document.getElementById('riskStatus');
+    if(nextStatus) nextStatus.innerHTML = `<span style="color:var(--safe);font-weight:600">✓ Profil kaydedildi</span> — Risk: <strong>${rtLabel?.label||'—'}</strong> · Vade: <strong>${ihLabel?.label||'—'}</strong>`;
   }catch(e){
     status.textContent = e.message;
-    if(btn){ btn.disabled = false; btn.textContent = 'Profilimi Hesapla & Kaydet'; }
+    if(btn){ btn.disabled = false; btn.textContent = originalBtnText; }
   }
 }
 
@@ -835,6 +847,37 @@ function userAdviceHtml(items){
   }).join('');
 }
 
+function riskInputHtml(d, sliderValue){
+  return `<div class="card-title">Risk Tercihiniz</div>
+    <div class="risk-section-header">PDF verisiyle birlikte kullanılacak iki kullanıcı girdisi</div>
+    <div class="risk-grid">
+      <div class="risk-input-card">
+        <div class="risk-input-title">Ne kadar kayıpla başa çıkabilirim?</div>
+        <div class="risk-input-help">Yatırımınız geçici olarak değer kaybederse size en uygun seviyeyi seçin.</div>
+        <div class="risk-input-control">
+          <div class="risk-label-badge" id="riskBadge"></div>
+          <input data-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance',d.inputs.risk)}">
+          <div class="risk-ticks"><span>Düşük</span><span>Orta</span><span>Yüksek</span></div>
+          <div class="risk-label-desc" id="riskDesc"></div>
+          <div class="slider-val" data-risk-value="risk_tolerance"></div>
+        </div>
+      </div>
+      <div class="risk-input-card">
+        <div class="risk-input-title">Paramı ne kadar süre bağlayabilirim?</div>
+        <div class="risk-input-help">Süre uzadıkça sistem daha dalgalı yatırımlara daha fazla alan açabilir.</div>
+        <div class="risk-input-control">
+          <div class="risk-label-badge" id="horizonBadge"></div>
+          <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon',d.inputs.vade)}">
+          <div class="risk-ticks"><span>Kısa</span><span>Orta</span><span>Uzun</span></div>
+          <div class="risk-label-desc" id="horizonDesc"></div>
+          <div class="slider-val" data-risk-value="investment_horizon"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="riskBtn" style="margin-top:12px;text-transform:none">Profilimi Güncelle</button>
+    <div class="status-text" id="riskStatus"></div>`;
+}
+
 function render(d){
   const pc = profileColor(d.profil);
   const pct = Math.round(d.defuzz*100);
@@ -862,6 +905,9 @@ function render(d){
     'Dengeli':'Hem büyüme hem güvenlik dengesi sunan karma yapı sana göre.',
     'Agresif':'Uzun vadede yüksek getiri için kısa vadeli dalgalanmayı göze alabiliyorsun.'
   };
+
+  const profileInputArea = document.getElementById('profileInputArea');
+  if(profileInputArea) profileInputArea.innerHTML = riskInputHtml(d, sliderValue);
 
   document.getElementById('contentArea').innerHTML = `
   <div class="mode-tabs" role="tablist" aria-label="Görünüm seçimi">
@@ -925,31 +971,16 @@ function render(d){
         </div>
       </div>
       <div class="card">
-        <div class="card-title">Risk Tercihiniz</div>
-        <div class="risk-grid" style="grid-template-columns:1fr">
-          <div class="risk-input-card">
-            <div class="risk-input-title">Ne kadar kayıpla başa çıkabilirim?</div>
-            <div class="risk-input-control">
-              <div class="risk-label-badge" id="riskBadge"></div>
-              <input data-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance',d.inputs.risk)}">
-              <div class="risk-ticks"><span>Düşük</span><span>Orta</span><span>Yüksek</span></div>
-              <div class="risk-label-desc" id="riskDesc"></div>
-              <div class="slider-val" data-risk-value="risk_tolerance"></div>
-            </div>
-          </div>
-          <div class="risk-input-card">
-            <div class="risk-input-title">Paramı ne kadar süre bağlayabilirim?</div>
-            <div class="risk-input-control">
-              <div class="risk-label-badge" id="horizonBadge"></div>
-              <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon',d.inputs.vade)}">
-              <div class="risk-ticks"><span>Kısa</span><span>Orta</span><span>Uzun</span></div>
-              <div class="risk-label-desc" id="horizonDesc"></div>
-              <div class="slider-val" data-risk-value="investment_horizon"></div>
-            </div>
-          </div>
+        <div class="card-title">Öneri Özeti</div>
+        <div class="advice-detail">
+          Sistem PDF'ten gelir, gider, borç yükü ve acil durum tamponunu çıkarır; üstteki iki kullanıcı tercihiyle birlikte yatırım profilini hesaplar.
         </div>
-        <button class="btn" id="riskBtn" style="margin-top:12px;text-transform:none">Profilimi Güncelle</button>
-        <div class="status-text" id="riskStatus"></div>
+        <div style="margin-top:14px">
+          <div class="kat-item"><div class="kat-name">Risk tercihi</div><div class="kat-amt">${riskLevels.find(l=>d.inputs.risk<l.max)?.label || 'Dengeli'}</div></div>
+          <div class="kat-item"><div class="kat-name">Yatırım süresi</div><div class="kat-amt">${horizonLevels.find(l=>d.inputs.vade<l.max)?.label || 'Orta'}</div></div>
+          <div class="kat-item"><div class="kat-name">Acil durum tamponu</div><div class="kat-amt">${d.banka.tampon_ay == null ? 'Belirsiz' : d.banka.tampon_ay.toFixed(1)+' ay'}</div></div>
+          <div class="kat-item"><div class="kat-name">Borç yükü</div><div class="kat-amt">%${((d.banka.borc_yuku_orani||0)*100).toFixed(1)}</div></div>
+        </div>
       </div>
     </div>
 

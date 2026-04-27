@@ -76,6 +76,7 @@ Yeni 6 girdili fuzzy degisiklikleri:
 - Kategori bazli oneri kartlari eklendi.
 - Pasif fuzzy kurallari arayuzde katlanabilir bolume tasindi.
 - Arayuz iki moda ayrildi: varsayilan `Oneri Paneli` kullanici odakli sade ekran, `Teknik Analiz` mevcut detayli fuzzy/OCR ekranidir.
+- PDF yukleme alani ve risk/vade sorulari ustte yan yana tutulur; kullanici girdileri tek bolgede toplanir.
 
 ## Calisma Ortami
 
@@ -329,6 +330,10 @@ Etkisi:
 
 - Tampon zayifsa agresif portfoy onerisi baskilanir.
 - Tampon gucluyse kullanicinin risk toleransi daha rahat dikkate alinabilir.
+
+Uyelik fonksiyonu son durumda daha yumusak ucgensel kumelerle ayarlidir.
+Bu degisiklik, tek bir aralikta uzun sure 1.000 uyelik gorunmesini azaltir;
+ornek olarak 0.129 tampon girdisi `Zayif` icin yaklasik 0.69 uyelik verir.
 
 ### Borc Yuku Orani
 

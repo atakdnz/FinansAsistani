@@ -30,8 +30,8 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 Uygulama iki modla acilir:
 
 - **Oneri Paneli:** Varsayilan kullanici ekrani. Yalnizca profil, portfoy,
-  temel finans ozeti, risk/vade sorulari ve kisisel tasarruf onerilerini
-  gosterir.
+  temel finans ozeti ve kisisel tasarruf onerilerini gosterir. PDF yukleme
+  alani ile risk/vade sorulari sayfanin ustunde yan yana tutulur.
 - **Teknik Analiz:** Sunum ve hoca sorulari icin detay ekranidir. OCR kontrolu,
   siniflandirma ozeti, uyelik fonksiyonlari, Mamdani kural aktivasyonlari,
   agregasyon ve centroid grafikleri burada kalir.

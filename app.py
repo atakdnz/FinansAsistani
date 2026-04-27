@@ -542,9 +542,9 @@ def run_fuzzy():
             "Uzun" : fuzz.trapmf(x,[0.55,0.85,1.0,1.0]),
         },
         "tampon": {
-            "Zayıf" : fuzz.trapmf(x,[0.0,0.0,0.15,0.40]),
+            "Zayıf" : fuzz.trimf(x,[0.0,0.0,0.42]),
             "Orta"  : fuzz.trimf(x,[0.25,0.55,0.85]),
-            "Güçlü" : fuzz.trapmf(x,[0.70,0.92,1.0,1.0]),
+            "Güçlü" : fuzz.trimf(x,[0.65,1.0,1.0]),
         },
         "borc": {
             "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.10,0.28]),
