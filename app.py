@@ -9,7 +9,7 @@ import skfuzzy as fuzz
 from flask import Flask, render_template, jsonify, request
 from werkzeug.utils import secure_filename
 from statement_pdf_pipeline import process_pdf
-from transaction_classifier import classify_dataframe, parse_amount
+from transaction_classifier import classify_dataframe, classify_transaction, has_positive_income_signal, parse_amount
 
 app = Flask(__name__)
 
@@ -58,6 +58,36 @@ def mf_to_points(x_arr, mf_arr, steps=200):
 
 def clamp01(value):
     return max(0.0, min(1.0, float(value)))
+
+def finite_float(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if np.isfinite(number) else default
+
+def round_finite(value, digits=2, default=0.0):
+    return round(finite_float(value, default), digits)
+
+def round_optional(value, digits=2):
+    if value is None:
+        return None
+    number = finite_float(value, None)
+    return None if number is None else round(number, digits)
+
+def sanitize_json(value):
+    if isinstance(value, dict):
+        return {key: sanitize_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_json(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_json(item) for item in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        number = float(value)
+        return number if np.isfinite(number) else None
+    return value
 
 def load_bank_data():
     if os.path.exists(EXTRACTED_PATH):
@@ -158,7 +188,7 @@ def calculate_financial_metrics(banka):
     aylik_zorunlu_ort = float(aylik_zorunlu.mean()) if not aylik_zorunlu.empty else 0.0
     if son_bakiye is not None and aylik_zorunlu_ort > 0:
         tampon_ay = max(0.0, son_bakiye / aylik_zorunlu_ort)
-        acil_tampon = clamp01(tampon_ay / 3.0)
+        acil_tampon = clamp01(tampon_ay / 6.0)
     else:
         tampon_ay = None
         acil_tampon = 0.5
@@ -391,7 +421,33 @@ def prepare_bank_data(banka):
     banka.columns = banka.columns.str.strip()
     if not CLASSIFICATION_COLUMNS.issubset(set(banka.columns)):
         banka = classify_dataframe(banka)
+    else:
+        fallback_mask = (
+            banka["Sınıflandırma Yöntemi"].fillna("").ne("manual")
+            & banka["Kategori"].fillna("").eq("Diğer")
+        )
+        if fallback_mask.any():
+            reclassified = classify_dataframe(banka.loc[fallback_mask], overwrite_category=True)
+            improved_mask = reclassified["Kategori"].ne("Diğer")
+            if improved_mask.any():
+                improved_index = reclassified[improved_mask].index
+                for column in CLASSIFICATION_COLUMNS:
+                    banka.loc[improved_index, column] = reclassified.loc[improved_index, column]
     banka["Tutar"] = banka["Tutar"].apply(parse_amount)
+    positive_expense_mask = (
+        banka["Tutar"].gt(0)
+        & banka["Sınıflandırma Yöntemi"].fillna("").ne("manual")
+        & ~banka["Açıklama"].apply(has_positive_income_signal)
+    )
+    for idx, row in banka[positive_expense_mask].iterrows():
+        expense_result = classify_transaction(row.get("Açıklama", ""), -abs(row["Tutar"]))
+        if expense_result.category not in {"Diğer", "Gelir"} and expense_result.confidence >= 0.75:
+            banka.loc[idx, "Tutar"] = -abs(row["Tutar"])
+            banka.loc[idx, "Kategori"] = expense_result.category
+            banka.loc[idx, "Gider Tipi"] = expense_result.expense_type
+            banka.loc[idx, "Sınıflandırma Güveni"] = expense_result.confidence
+            banka.loc[idx, "Sınıflandırma Yöntemi"] = expense_result.method
+            banka.loc[idx, "Sınıflandırma Kuralı"] = f"{expense_result.rule};positive_card_amount"
     banka["Tarih"] = pd.to_datetime(banka["Tarih"], errors="coerce", dayfirst=True)
     banka["Ay"] = banka["Tarih"].dt.to_period("M")
     return banka
@@ -413,7 +469,7 @@ def _raw_transaction_rows(include_micro=False):
             "bakiye": None if pd.isna(row.get("Bakiye", None)) else parse_amount(row.get("Bakiye", 0)),
             "kategori": str(row.get("Kategori", "Diğer")),
             "gider_tipi": str(row.get("Gider Tipi", "Belirsiz")),
-            "guven": float(row.get("Sınıflandırma Güveni", 0) or 0),
+            "guven": finite_float(row.get("Sınıflandırma Güveni", 0)),
             "yontem": str(row.get("Sınıflandırma Yöntemi", "")),
             "kural": str(row.get("Sınıflandırma Kuralı", "")),
             "ham_ocr": str(row.get("Ham OCR Satırı", "")),
@@ -457,34 +513,34 @@ def run_fuzzy():
     # ── Üyelik Fonksiyonları ─────────────────────────────────
     mf = {
         "duz": {
-            "Düzensiz": fuzz.trapmf(x,[0.0,0.0,0.30,0.50]),
-            "Orta"    : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
-            "Düzenli" : fuzz.trapmf(x,[0.50,0.70,1.0,1.0]),
+            "Düzensiz": fuzz.trapmf(x,[0.0,0.0,0.18,0.45]),
+            "Orta"    : fuzz.trimf(x,[0.25,0.50,0.75]),
+            "Düzenli" : fuzz.trapmf(x,[0.55,0.85,1.0,1.0]),
         },
         "esn": {
-            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
-            "Orta"   : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
-            "Yüksek" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.18,0.45]),
+            "Orta"   : fuzz.trimf(x,[0.25,0.50,0.75]),
+            "Yüksek" : fuzz.trapmf(x,[0.55,0.85,1.0,1.0]),
         },
         "risk": {
-            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
-            "Orta"   : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
-            "Yüksek" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.18,0.45]),
+            "Orta"   : fuzz.trimf(x,[0.25,0.50,0.75]),
+            "Yüksek" : fuzz.trapmf(x,[0.55,0.85,1.0,1.0]),
         },
         "vade": {
-            "Kısa" : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
-            "Orta" : fuzz.trapmf(x,[0.30,0.45,0.55,0.70]),
-            "Uzun" : fuzz.trapmf(x,[0.55,0.75,1.0,1.0]),
+            "Kısa" : fuzz.trapmf(x,[0.0,0.0,0.18,0.45]),
+            "Orta" : fuzz.trimf(x,[0.25,0.50,0.75]),
+            "Uzun" : fuzz.trapmf(x,[0.55,0.85,1.0,1.0]),
         },
         "tampon": {
-            "Zayıf" : fuzz.trapmf(x,[0.0,0.0,0.25,0.45]),
-            "Orta"  : fuzz.trapmf(x,[0.30,0.45,0.60,0.78]),
-            "Güçlü" : fuzz.trapmf(x,[0.62,0.80,1.0,1.0]),
+            "Zayıf" : fuzz.trapmf(x,[0.0,0.0,0.15,0.40]),
+            "Orta"  : fuzz.trimf(x,[0.25,0.55,0.85]),
+            "Güçlü" : fuzz.trapmf(x,[0.70,0.92,1.0,1.0]),
         },
         "borc": {
-            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.15,0.30]),
-            "Orta"   : fuzz.trapmf(x,[0.20,0.35,0.48,0.65]),
-            "Yüksek" : fuzz.trapmf(x,[0.50,0.70,1.0,1.0]),
+            "Düşük"  : fuzz.trapmf(x,[0.0,0.0,0.10,0.28]),
+            "Orta"   : fuzz.trimf(x,[0.15,0.35,0.60]),
+            "Yüksek" : fuzz.trapmf(x,[0.45,0.70,1.0,1.0]),
         },
     }
     mf_out = {
@@ -644,18 +700,18 @@ def run_fuzzy():
         "portfolyo": portfolyolar[profil],
         "banka": {
             "kaynak": banka_kaynak,
-            "toplam_gelir": round(float(metrics["toplam_gelir"]),2),
-            "toplam_gider": round(float(metrics["toplam_gider"]),2),
-            "aylik_gelir_ort": round(float(aylik_gelir.mean()),2),
-            "aylik_gider_ort": round(float(aylik_gider.mean()),2),
-            "aylik_tasarruf_ort": round(float(aylik_tasarruf.mean()),2),
-            "istege_bagli": round(float(metrics["esnek_gider"]),2),
-            "borc_yuku_orani": round(float(metrics["borc_yuku"]),4),
-            "acil_durum_tamponu": round(float(metrics["acil_tampon"]),4),
-            "tampon_ay": None if metrics["tampon_ay"] is None else round(float(metrics["tampon_ay"]),2),
-            "tasarruf_orani": round(float(metrics["tasarruf_orani"]),4),
-            "kisilabilir_oran": round(float(metrics["kisilabilir_oran"]),4),
-            "kategoriler": {k: round(float(v),2) for k,v in kat_gider.items()},
+            "toplam_gelir": round_finite(metrics["toplam_gelir"],2),
+            "toplam_gider": round_finite(metrics["toplam_gider"],2),
+            "aylik_gelir_ort": round_finite(aylik_gelir.mean(),2),
+            "aylik_gider_ort": round_finite(aylik_gider.mean(),2),
+            "aylik_tasarruf_ort": round_finite(aylik_tasarruf.mean(),2),
+            "istege_bagli": round_finite(metrics["esnek_gider"],2),
+            "borc_yuku_orani": round_finite(metrics["borc_yuku"],4),
+            "acil_durum_tamponu": round_finite(metrics["acil_tampon"],4),
+            "tampon_ay": round_optional(metrics["tampon_ay"],2),
+            "tasarruf_orani": round_finite(metrics["tasarruf_orani"],4),
+            "kisilabilir_oran": round_finite(metrics["kisilabilir_oran"],4),
+            "kategoriler": {k: round_finite(v,2) for k,v in kat_gider.items()},
             "gider_analizi": gider_analizi,
             "oneriler": recommendations,
             "mikro_islem": {
@@ -672,10 +728,10 @@ def run_fuzzy():
                     {
                         "tarih": "" if pd.isna(row["Tarih"]) else str(row["Tarih"].date()),
                         "aciklama": str(row.get("Açıklama", "")),
-                        "tutar": round(float(row.get("Tutar", 0)), 2),
+                        "tutar": round_finite(row.get("Tutar", 0), 2),
                         "kategori": str(row.get("Kategori", "")),
                         "gider_tipi": str(row.get("Gider Tipi", "")),
-                        "guven": round(float(row.get("Sınıflandırma Güveni", 0)), 2),
+                        "guven": round_finite(row.get("Sınıflandırma Güveni", 0), 2),
                     }
                     for _, row in dusuk_guven.head(10).iterrows()
                 ],
@@ -697,7 +753,7 @@ def index():
 @app.route("/api/data")
 def api_data():
     data = run_fuzzy()
-    return jsonify(data)
+    return jsonify(sanitize_json(data))
 
 @app.route("/api/transactions", methods=["GET", "POST"])
 def transactions():

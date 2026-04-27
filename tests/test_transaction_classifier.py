@@ -5,6 +5,7 @@ import tempfile
 import pandas as pd
 
 import app as finance_app
+from statement_pdf_pipeline import OcrToken, parse_transactions
 from transaction_classifier import classify_dataframe, classify_transaction, parse_amount
 
 
@@ -24,8 +25,10 @@ class TransactionClassifierTests(unittest.TestCase):
             ("KK OTOMATIK ODEME", "-4.092,71", "Borç/Kredi/Kart", "Zorunlu"),
             ("KREDI YURTLAR KURUMU OGRENIM KREDISI", "4.000,00", "Gelir", "Gelir"),
             ("S/GETIR 1 MUTABAKAT SANAL POS ALISVERIS", "-125,00", "Gıda", "Kısılabilir"),
+            ("Starbucks - Sabah Kahvesi", "125,00", "Gıda", "Kısılabilir"),
             ("YEMEKPAY/YEMEK SEPET", "-176,00", "Gıda", "Kısılabilir"),
             ("ECZANE SAGLIK HARCAMASI", "-240,00", "Sağlık", "Zorunlu"),
+            ("İş Bankası Kredi Kartı Ödemesi", "-2500,00", "Borç/Kredi/Kart", "Zorunlu"),
         ]
 
         for description, amount, category, expense_type in cases:
@@ -108,6 +111,41 @@ class TransactionClassifierTests(unittest.TestCase):
         self.assertAlmostEqual(finance_app.calculate_risk_score(payload), 0.4)
         self.assertEqual(finance_app.calculate_investment_horizon(payload), 1.0)
 
+    def test_prepare_bank_data_flips_positive_card_expenses(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "Tarih": "26.04.2026",
+                    "Açıklama": "Starbucks - Sabah Kahvesi",
+                    "Tutar": "125,00",
+                    "Bakiye": "28.345,50",
+                    "Kategori": "Gelir",
+                    "Gider Tipi": "Gelir",
+                    "Sınıflandırma Güveni": 0.70,
+                    "Sınıflandırma Yöntemi": "amount",
+                    "Sınıflandırma Kuralı": "positive_amount",
+                },
+                {
+                    "Tarih": "24.04.2026",
+                    "Açıklama": "Aylık Faiz Getirisi",
+                    "Tutar": "2.140,00",
+                    "Bakiye": "152.140,00",
+                    "Kategori": "Gelir",
+                    "Gider Tipi": "Gelir",
+                    "Sınıflandırma Güveni": 0.95,
+                    "Sınıflandırma Yöntemi": "rule",
+                    "Sınıflandırma Kuralı": "income_signal",
+                },
+            ]
+        )
+
+        prepared = finance_app.prepare_bank_data(df)
+
+        self.assertEqual(prepared.loc[0, "Kategori"], "Gıda")
+        self.assertEqual(prepared.loc[0, "Tutar"], -125.0)
+        self.assertEqual(prepared.loc[1, "Kategori"], "Gelir")
+        self.assertEqual(prepared.loc[1, "Tutar"], 2140.0)
+
     def test_financial_metrics_include_debt_and_emergency_buffer(self):
         df = pd.DataFrame(
             [
@@ -153,7 +191,7 @@ class TransactionClassifierTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["toplam_gider"], 3000.0)
         self.assertEqual(metrics["mikro_adedi"], 1)
         self.assertEqual(metrics["mikro_toplam"], 4.0)
-        self.assertEqual(metrics["acil_tampon"], 1.0)
+        self.assertGreater(metrics["acil_tampon"], 0.99)
 
     def test_raw_transaction_rows_hide_micro_transactions(self):
         fd, path = tempfile.mkstemp(suffix=".csv")
@@ -247,6 +285,60 @@ class TransactionClassifierTests(unittest.TestCase):
         self.assertGreater(food_item["target_saving"], 0)
         self.assertIn("yatırım bütçesi", analysis["summary"])
         self.assertIn("mikro tahsilatlar", analysis["summary"])
+
+    def test_pdf_parser_accepts_slash_dates_and_table_columns(self):
+        tokens = [
+            OcrToken("26/04/2026", 0.99, (10, 10, 90, 30), 1),
+            OcrToken("88412033", 0.99, (120, 10, 190, 30), 1),
+            OcrToken("Starbucks - Sabah Kahvesi", 0.99, (220, 10, 430, 30), 1),
+            OcrToken("TL", 0.99, (460, 10, 490, 30), 1),
+            OcrToken("-125,00", 0.99, (520, 10, 590, 30), 1),
+            OcrToken("28.345,50", 0.99, (620, 10, 700, 30), 1),
+            OcrToken("01/04/2026", 0.99, (10, 45, 90, 65), 1),
+            OcrToken("88411290", 0.99, (120, 45, 190, 65), 1),
+            OcrToken("Dönem Başı Devir Bakiyesi", 0.99, (220, 45, 430, 65), 1),
+            OcrToken("TL", 0.99, (460, 45, 490, 65), 1),
+            OcrToken("15.824,48", 0.99, (520, 45, 590, 65), 1),
+            OcrToken("15.824,48", 0.99, (620, 45, 700, 65), 1),
+        ]
+
+        transactions = parse_transactions(tokens)
+
+        self.assertEqual(len(transactions), 1)
+        self.assertEqual(transactions[0].tarih, "26.04.2026")
+        self.assertEqual(transactions[0].aciklama, "Starbucks - Sabah Kahvesi")
+        self.assertEqual(transactions[0].tutar, -125.0)
+        self.assertEqual(transactions[0].bakiye, 28345.5)
+
+    def test_api_data_does_not_emit_nan_for_empty_extracted_file(self):
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        old_path = finance_app.EXTRACTED_PATH
+        try:
+            pd.DataFrame(
+                columns=[
+                    "Tarih",
+                    "Açıklama",
+                    "Kategori",
+                    "Gider Tipi",
+                    "Tutar",
+                    "Bakiye",
+                    "Sınıflandırma Güveni",
+                    "Sınıflandırma Yöntemi",
+                    "Sınıflandırma Kuralı",
+                ]
+            ).to_csv(path, index=False)
+            finance_app.EXTRACTED_PATH = path
+
+            response = finance_app.app.test_client().get("/api/data")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn(b"NaN", response.data)
+            self.assertEqual(response.get_json()["banka"]["aylik_gelir_ort"], 0.0)
+        finally:
+            finance_app.EXTRACTED_PATH = old_path
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

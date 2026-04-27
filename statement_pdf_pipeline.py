@@ -26,7 +26,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from transaction_classifier import ClassificationResult, classify_transaction, parse_amount
+from transaction_classifier import ClassificationResult, classify_transaction, has_positive_income_signal, normalize_text, parse_amount
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -34,7 +34,7 @@ PADDLE_CACHE_DIR = BASE_DIR / ".paddlex_cache"
 EMBED_PYTHON = BASE_DIR / ".venv_embed" / "bin" / "python"
 EMBED_HELPER = BASE_DIR / "embedding_classifier.py"
 AMOUNT_RE = re.compile(r"-?\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|-?\d+[.,]\d{2}")
-DATE_RE = re.compile(r"\b\d{2}\.\d{2}\.\d{4}\b")
+DATE_RE = re.compile(r"\b\d{2}[./]\d{2}[./]\d{4}\b")
 
 
 @dataclass
@@ -155,6 +155,16 @@ def group_tokens_into_lines(tokens: list[OcrToken], y_threshold: float = 22.0) -
     return [sorted(line, key=lambda item: item.x1) for line in lines]
 
 
+def _normalize_date(value: str) -> str:
+    return value.replace("/", ".")
+
+
+def _clean_description(value: str) -> str:
+    text = re.sub(r"^\d{4,}\s+", "", value.strip(" -|"))
+    text = re.sub(r"\b(TL|TRY)\b", " ", text, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", text).strip(" -|")
+
+
 def parse_transactions(tokens: list[OcrToken]) -> list[ParsedTransaction]:
     transactions: list[ParsedTransaction] = []
     for line in group_tokens_into_lines(tokens):
@@ -174,11 +184,14 @@ def parse_transactions(tokens: list[OcrToken]) -> list[ParsedTransaction]:
 
         amount_match = amounts[-2] if len(amounts) >= 2 else amounts[-1]
         balance_match = amounts[-1] if len(amounts) >= 2 else None
-        description = text[date_match.end() : amount_match.start()].strip(" -|")
+        description = _clean_description(text[date_match.end() : amount_match.start()])
+        normalized_description = normalize_text(description)
+        if not description or normalized_description.startswith("DONEM BASI") or "LIMITI" in normalized_description:
+            continue
 
         transactions.append(
             ParsedTransaction(
-                tarih=date_match.group(0),
+                tarih=_normalize_date(date_match.group(0)),
                 aciklama=description,
                 tutar=parse_amount(amount_match.group(0)),
                 bakiye=parse_amount(balance_match.group(0)) if balance_match else None,
@@ -222,9 +235,22 @@ def _embedding_suggestions(descriptions: list[str]) -> list[dict[str, Any] | Non
 
 
 def classify_transactions(transactions: list[ParsedTransaction], embedding_threshold: float = 0.50) -> list[ClassifiedTransaction]:
-    deterministic: list[ClassificationResult] = [
-        classify_transaction(item.aciklama, item.tutar) for item in transactions
-    ]
+    deterministic: list[ClassificationResult] = []
+    for item in transactions:
+        result = classify_transaction(item.aciklama, item.tutar)
+        if item.tutar > 0 and not has_positive_income_signal(item.aciklama):
+            expense_result = classify_transaction(item.aciklama, -abs(item.tutar))
+            if expense_result.category not in {"Diğer", "Gelir"} and expense_result.confidence >= 0.75:
+                item.tutar = -abs(item.tutar)
+                result = ClassificationResult(
+                    expense_result.category,
+                    expense_result.expense_type,
+                    expense_result.confidence,
+                    expense_result.method,
+                    f"{expense_result.rule};positive_card_amount",
+                    expense_result.normalized_description,
+                )
+        deterministic.append(result)
     low_conf_descriptions = [
         item.aciklama for item, result in zip(transactions, deterministic) if result.confidence < embedding_threshold
     ]

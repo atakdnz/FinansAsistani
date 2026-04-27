@@ -62,6 +62,12 @@ Turkce karakterler sade forma indirilir, noktalama ve fazla bosluklar
 temizlenir. Bu sayede `YEMEKPAY`, `GETIR`, `BSMV`, `KOMISYON` gibi sinyaller
 daha kararli yakalanir.
 
+PDF satirlarinda tarih `26.04.2026` veya `26/04/2026` formatinda gelebilir.
+Parser iki formati da kabul eder, fis numarasi ve `TL` birimi gibi tablo
+kolonlarini aciklamadan temizler. Kredi karti dokumlerinde harcama tutarlari
+eksi isareti olmadan gelebilecegi icin, aciklama gida/alisveris/ulasim gibi
+gider sinyali tasiyorsa bu satir analizde gider olarak ele alinir.
+
 Turkce metinler icin PaddleOCR tarafinda `latin_PP-OCRv5_mobile_rec`
 recognition modeli kullanilir. Bu model Latin alfabeli diller arasinda
 Turkce'yi de destekler ve `ÖĞRENİM`, `ALIŞVERİŞ`, `İŞYERİ` gibi kelimelerde

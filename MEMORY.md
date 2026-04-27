@@ -196,6 +196,17 @@ Kural tabani su anda 17 hedefli Mamdani kuralidir. Uzun vade tek basina agresif 
 
 10 TL ve altindaki negatif islemler mikro tahsilat kabul edilir. Bu satirlar ham CSV'de kalir, ama dashboard islem tablosunda gosterilmez ve toplam gider, kategori dagilimi, aylik trend, fuzzy girdi hesaplari ve kategori analizini etkilemez.
 
+PDF/OCR parser `dd.mm.yyyy` ve `dd/mm/yyyy` tarihlerini kabul eder. Tablo
+formatli dokumlerde fis numarasi ve `TL` birimi aciklamadan temizlenir, `Donem
+Basi Devir Bakiyesi` ve limit satirlari islem olarak alinmaz. Kredi karti
+dokumlerinde bazi harcamalar eksi isareti olmadan gelebilir; aciklama gider
+sinyali tasiyorsa runtime'da tutar negatife cevrilir ve `positive_card_amount`
+kural ekiyle isaretlenir.
+
+`/api/data` yaniti `sanitize_json` ile temizlenir. Bos veya basarisiz OCR
+sonucunda aylik ortalamalar `NaN` uretemez; bos ortalamalar 0 veya gerekli
+yerlerde `null` olarak dondurulur.
+
 ### `statement_pdf_pipeline.py`
 
 PDF -> image -> PaddleOCR -> islem satiri -> siniflandirma -> CSV hattidir.

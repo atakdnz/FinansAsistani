@@ -35,6 +35,20 @@ TR_TRANSLATION = str.maketrans(
     }
 )
 
+POSITIVE_INCOME_TERMS = (
+    "KREDI YURTLAR KURUMU",
+    "KYK",
+    "OGRENIM KREDISI",
+    "ATM YATAN",
+    "MAAS",
+    "UCRET",
+    "FREELANCE",
+    "TEMETTU",
+    "IADE",
+    "FAIZ GETIRISI",
+    "FAIZ GELIRI",
+)
+
 
 @dataclass(frozen=True)
 class ClassificationResult:
@@ -105,6 +119,10 @@ def _contains_any(text: str, terms: Iterable[str]) -> bool:
     return any(term in text for term in terms)
 
 
+def has_positive_income_signal(description: object) -> bool:
+    return _contains_any(normalize_text(description), POSITIVE_INCOME_TERMS)
+
+
 def classify_transaction(description: object, amount: object = 0.0) -> ClassificationResult:
     normalized = normalize_text(description)
     parsed_amount = parse_amount(amount)
@@ -112,15 +130,16 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
     if parsed_amount > 0:
         if _contains_any(normalized, ("KREDI YURTLAR KURUMU", "KYK", "OGRENIM KREDISI")):
             return _result("Gelir", "Gelir", 0.90, "rule", "student_loan_income", normalized)
-        if _contains_any(normalized, ("ATM YATAN", "MAAS", "UCRET", "FREELANCE", "TEMETTU", "IADE")):
+        if has_positive_income_signal(normalized):
             return _result("Gelir", "Gelir", 0.95, "rule", "income_signal", normalized)
-        return _result("Gelir", "Gelir", 0.70, "amount", "positive_amount", normalized)
 
     if _contains_any(normalized, ("BSMV", "KOMISYON", "MASRAF", "HAVALE UCRETI", "EFT UCRETI", "FAST UCRETI")):
         return _result("Banka Ücreti", "Zorunlu", 0.95, "rule", "bank_fee", normalized)
 
     if _contains_any(normalized, ("KK OTOMATIK ODEME", "KREDI KARTI", "KART ODEME", "KREDI ODEMESI", "BORC ODEME", "TAKSIT")) or normalized == "KREDI":
         return _result("Borç/Kredi/Kart", "Zorunlu", 0.90, "rule", "debt_or_card_payment", normalized)
+    if _contains_any(normalized, ("IS BANKASI", "ISBANK", "TURKIYE IS BANKASI")):
+        return _result("Borç/Kredi/Kart", "Zorunlu", 0.78, "rule", "bank_card_issuer", normalized)
 
     if _contains_any(
         normalized,
@@ -183,6 +202,9 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
 
     if parsed_amount < 0:
         return _result("Diğer", "Belirsiz", 0.35, "fallback", "negative_unknown", normalized)
+
+    if parsed_amount > 0:
+        return _result("Gelir", "Gelir", 0.70, "amount", "positive_amount", normalized)
 
     return _result("Diğer", "Belirsiz", 0.20, "fallback", "unknown", normalized)
 

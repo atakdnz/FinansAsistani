@@ -53,6 +53,11 @@ Bu sayede kural tabani bozuk OCR ciktilarinda bile `GETIR`, `YEMEKPAY`, `BSMV`, 
 
 PaddleOCR'da recognition modeli olarak `latin_PP-OCRv5_mobile_rec` kullaniliyor. Bu model Latin alfabeli diller icin egitildigi ve Turkce'yi destekledigi icin `en_PP-OCRv5_mobile_rec` modeline gore daha dogru sonuc verdi. Test PDF'inde `ÖĞRENİM`, `KREDİ`, `ALIŞVERİŞ`, `İŞYERİ` gibi kelimeler Latin modelle daha duzgun okundu.
 
+Tablo formatli PDF'lerde parser `26.04.2026` ve `26/04/2026` tarihlerini
+destekler. Fis numarasi ve `TL` birimi aciklamadan temizlenir. Kredi karti
+dokumlerinde harcama tutarlari eksi isareti olmadan gelebilirse aciklama gider
+sinyali tasidigi durumda tutar analizde gider olarak isaretlenir.
+
 ## Dosya Dosya Kod Rehberi
 
 ### `app.py`
@@ -67,6 +72,7 @@ Flask uygulamasinin merkezidir.
 - Fuzzy uyelik fonksiyonlari, Mamdani kurallari, agregasyon ve centroid durulastirma burada calisir.
 - 10 TL ve altindaki mikro tahsilatlari ham veride tutar ama analiz ve tablo gosteriminden ayirir.
 - Kategori paylarini ve kategoriye ozel aksiyonlari `build_category_analysis` ile uretir.
+- `/api/data` icin `NaN`/sonsuz degerleri JSON'a cikmadan temizler.
 
 ### `statement_pdf_pipeline.py`
 
