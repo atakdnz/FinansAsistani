@@ -102,14 +102,26 @@ class TransactionClassifierTests(unittest.TestCase):
 
     def test_risk_score_keeps_investment_horizon_separate(self):
         payload = {
-            "loss_reaction": 0.2,
+            "risk_tolerance": 0.2,
             "investment_horizon": 1.0,
-            "volatility_comfort": 0.4,
-            "growth_preference": 0.6,
         }
 
-        self.assertAlmostEqual(finance_app.calculate_risk_score(payload), 0.4)
+        self.assertAlmostEqual(finance_app.calculate_risk_score(payload), 0.2)
         self.assertEqual(finance_app.calculate_investment_horizon(payload), 1.0)
+
+    def test_profile_defaults_migrates_legacy_risk_answer(self):
+        profile = finance_app._profile_defaults({
+            "answers": {
+                "loss_reaction": 0.35,
+                "investment_horizon": 0.8,
+                "volatility_comfort": 1.0,
+                "growth_preference": 0.35,
+            }
+        })
+
+        self.assertEqual(profile["risk_tolerance"], 0.35)
+        self.assertEqual(profile["investment_horizon"], 0.8)
+        self.assertEqual(set(profile["answers"].keys()), {"risk_tolerance", "investment_horizon"})
 
     def test_prepare_bank_data_flips_positive_card_expenses(self):
         df = pd.DataFrame(

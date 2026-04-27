@@ -108,25 +108,27 @@ def save_user_profile(profile):
         json.dump(profile, handle, ensure_ascii=False, indent=2)
 
 def calculate_risk_score(payload):
-    risk_keys = ("loss_reaction", "volatility_comfort", "growth_preference")
-    scores = [float(payload.get(key, 0.5)) for key in risk_keys]
-    return clamp01(sum(scores) / len(scores))
+    if "risk_tolerance" in payload:
+        return clamp01(float(payload.get("risk_tolerance", 0.5)))
+    if "loss_reaction" in payload:
+        return clamp01(float(payload.get("loss_reaction", 0.5)))
+    legacy_keys = ("volatility_comfort", "growth_preference")
+    legacy_scores = [float(payload[key]) for key in legacy_keys if key in payload]
+    return clamp01(sum(legacy_scores) / len(legacy_scores)) if legacy_scores else 0.5
 
 def calculate_investment_horizon(payload):
     return clamp01(float(payload.get("investment_horizon", 0.5)))
 
 def _profile_defaults(profile):
     answers = profile.get("answers", {})
-    risk = float(profile.get("risk_tolerance", 0.5))
+    risk = float(profile.get("risk_tolerance", answers.get("risk_tolerance", answers.get("loss_reaction", 0.5))))
     horizon = float(profile.get("investment_horizon", answers.get("investment_horizon", risk)))
     return {
         "risk_tolerance": clamp01(risk),
         "investment_horizon": clamp01(horizon),
         "answers": {
-            "loss_reaction": clamp01(answers.get("loss_reaction", risk)),
+            "risk_tolerance": clamp01(answers.get("risk_tolerance", risk)),
             "investment_horizon": clamp01(answers.get("investment_horizon", horizon)),
-            "volatility_comfort": clamp01(answers.get("volatility_comfort", risk)),
-            "growth_preference": clamp01(answers.get("growth_preference", risk)),
         },
     }
 
@@ -401,10 +403,8 @@ def compute_fuzzy_inputs(banka, fallback_ozet):
             "risk_tolerance": risk,
             "investment_horizon": vade,
             "answers": {
-                "loss_reaction": risk,
+                "risk_tolerance": risk,
                 "investment_horizon": vade,
-                "volatility_comfort": risk,
-                "growth_preference": risk,
             },
         })
     return {

@@ -12,7 +12,7 @@ Kisisel finans onerisi icin banka hesap dokumunu okuyup harcama davranisini anal
 6. Dusuk guvenli kayitlar icin embedding tabanli yardimci sinyal kullanilir.
 7. 10 TL ve altindaki mikro tahsilatlar analiz ve arayuz listesinden ayrilir.
 8. Gelir duzenliligi, esneklik, acil durum tamponu ve borc yuku hesaplanir.
-9. Kullanici risk toleransi ve yatirim vadesi sliderlarini doldurur.
+9. Kullanici risk toleransi ve yatirim ufku uzunlugu sliderlarini doldurur.
 10. 6 girdili Mamdani bulanik mantik ve centroid durulastirma ile yatirim profili uretilir.
 11. Gider kategorilerinin payi hesaplanir ve kategoriye ozel aksiyon onerileri uretilir.
 
@@ -36,10 +36,9 @@ Ana fuzzy sistem 6 girdi kullanir:
 - Acil durum tamponu
 - Borc yuku orani
 
-Risk toleransi kullanicinin kayip ve dalgalanmaya psikolojik dayanimi olarak
-hesaplanir. Yatirim vadesi ayri girdi olarak tutulur; uzun vade tek basina
-agresif profil uretmez, sadece risk toleransi ve finansal tampon uygunsa daha
-dalgali portfoylere alan acar.
+Risk toleransi kullanicidan tek slider olarak alinir. Yatirim vadesi ayri girdi
+olarak tutulur; uzun vade tek basina agresif profil uretmez, sadece risk
+toleransi ve finansal tampon uygunsa daha dalgali portfoylere alan acar.
 
 ## Mikro Islemler ve Oneriler
 

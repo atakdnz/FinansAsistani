@@ -111,7 +111,7 @@ Embedding modeli kategori aciklamalari ile islem aciklamasini vektor uzayinda ka
 Kullanici arayuzudur.
 
 - PDF yukleme alani vardir.
-- Risk toleransi slider'lari vardir.
+- Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card vardir.
 - Yatirim vadesi risk toleransindan ayri fuzzy girdi olarak kullanilir.
 - Onerilen yatirim profili gosterilir.
 - Gelir/gider ozetleri gosterilir.

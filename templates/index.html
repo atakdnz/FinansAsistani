@@ -131,6 +131,12 @@ canvas{max-width:100%}
 .slider-row label{font-size:.85rem;color:var(--text)}
 .slider-row input{width:100%;accent-color:var(--cyan)}
 .slider-val{text-align:right;font-size:.8rem;color:var(--cyan);font-weight:700}
+.risk-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px}
+.risk-input-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}
+.risk-input-title{font-weight:800;font-size:.92rem;margin-bottom:6px;color:var(--text)}
+.risk-input-help{font-size:.76rem;color:var(--muted);line-height:1.4;margin-bottom:14px}
+.risk-input-control{display:grid;grid-template-columns:1fr 44px;gap:12px;align-items:center}
+.risk-input-control input{width:100%;accent-color:var(--cyan)}
 .table-wrap{overflow-x:auto}
 .txn-table{width:100%;border-collapse:collapse;min-width:920px}
 .txn-table th,.txn-table td{border-bottom:1px solid var(--border);padding:10px 8px;text-align:left;font-size:.78rem;vertical-align:top}
@@ -454,26 +460,24 @@ function render(d){
       <div class="status" id="uploadStatus">Veri kaynağı: ${d.banka.kaynak || 'CSV'}</div>
     </div>
     <div class="card">
-      <div class="card-title">Risk ve Yatırım Vadesi</div>
-      <div class="slider-row">
-        <label>Kısa vadeli kayıpta sakin kalma</label>
-        <input data-risk="loss_reaction" type="range" min="0" max="1" step="0.05" value="${sliderValue('loss_reaction', d.inputs.risk)}">
-        <div class="slider-val" data-risk-value="loss_reaction"></div>
-      </div>
-      <div class="slider-row">
-        <label>Yatırım ufku uzunluğu</label>
-        <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon', d.inputs.vade)}">
-        <div class="slider-val" data-risk-value="investment_horizon"></div>
-      </div>
-      <div class="slider-row">
-        <label>Dalgalanmaya tolerans</label>
-        <input data-risk="volatility_comfort" type="range" min="0" max="1" step="0.05" value="${sliderValue('volatility_comfort', d.inputs.risk)}">
-        <div class="slider-val" data-risk-value="volatility_comfort"></div>
-      </div>
-      <div class="slider-row">
-        <label>Büyüme getirisi tercihi</label>
-        <input data-risk="growth_preference" type="range" min="0" max="1" step="0.05" value="${sliderValue('growth_preference', d.inputs.risk)}">
-        <div class="slider-val" data-risk-value="growth_preference"></div>
+      <div class="card-title">Risk Profili</div>
+      <div class="risk-card-grid">
+        <div class="risk-input-card">
+          <div class="risk-input-title">Risk Toleransı</div>
+          <div class="risk-input-help">Kayıp ve dalgalanmayı ne kadar tolere edebileceğini temsil eder.</div>
+          <div class="risk-input-control">
+            <input data-risk="risk_tolerance" type="range" min="0" max="1" step="0.05" value="${sliderValue('risk_tolerance', d.inputs.risk)}">
+            <div class="slider-val" data-risk-value="risk_tolerance"></div>
+          </div>
+        </div>
+        <div class="risk-input-card">
+          <div class="risk-input-title">Yatırım Ufku Uzunluğu</div>
+          <div class="risk-input-help">Parayı ne kadar uzun süre yatırımda tutabileceğini temsil eder.</div>
+          <div class="risk-input-control">
+            <input data-risk="investment_horizon" type="range" min="0" max="1" step="0.05" value="${sliderValue('investment_horizon', d.inputs.vade)}">
+            <div class="slider-val" data-risk-value="investment_horizon"></div>
+          </div>
+        </div>
       </div>
       <button class="btn" id="riskBtn" type="button">Risk Profilini Kaydet</button>
       <div class="status" id="riskStatus">Risk toleransı: ${d.inputs.risk.toFixed(4)} · Yatırım vadesi: ${d.inputs.vade.toFixed(4)}</div>

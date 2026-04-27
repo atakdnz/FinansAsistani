@@ -245,7 +245,7 @@ Kategori prototipleri ile islem aciklamasi embedding uzayinda karsilastirilir. A
 Tek sayfalik dashboard:
 
 - PDF yukleme.
-- Risk sliderlari.
+- Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card.
 - OCR islem kontrol ve manuel duzeltme tablosu.
 - Gelir/gider ozetleri.
 - Siniflandirma ozeti.
