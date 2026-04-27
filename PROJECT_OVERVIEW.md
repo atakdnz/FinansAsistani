@@ -113,7 +113,7 @@ Kullanici arayuzudur.
 - PDF yukleme alani vardir.
 - Varsayilan ekran sade `Oneri Paneli`dir; kullaniciya profil, portfoy, temel finans ozeti ve oneriler gosterilir.
 - PDF yukleme alani ile risk toleransi/yatirim vadesi sorulari yan yana durur; boylece sistem girdileri tek bolgede toplanir.
-- `Teknik Analiz` sekmesi mevcut detayli demo ekranini korur; OCR kontrolu, siniflandirma ozeti, fuzzy grafikler ve kural aktivasyonlari burada gosterilir.
+- `Teknik Analiz` sekmesi mevcut detayli demo ekranini korur; OCR kontrolu, siniflandirma ozeti, fuzzy grafikler ve kural aktivasyonlari burada gosterilir. OCR duzeltme tablosu acik gelir, ancak kendi icinde scroll eder.
 - Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card vardir.
 - Yatirim vadesi risk toleransindan ayri fuzzy girdi olarak kullanilir.
 - Onerilen yatirim profili gosterilir.

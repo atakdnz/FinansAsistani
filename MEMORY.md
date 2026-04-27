@@ -257,6 +257,7 @@ Tek sayfalik dashboard:
 - PDF yukleme.
 - Varsayilan Oneri Paneli: profil skoru, portfoy, temel finans ozeti, iki risk/vade sorusu ve kisisel tasarruf onerileri.
 - Teknik Analiz sekmesi: OCR kontrolu, siniflandirma, fuzzy uyelik grafikleri, kural aktivasyonlari, agregasyon ve centroid.
+- OCR duzeltme tablosu Teknik Analiz'de acik gelir, ancak tablo kendi icinde scroll eder. Pagination kullanilmadi; bu sayede kaydetme mantigi tum satirlari DOM'da tutmaya devam eder.
 - Risk toleransi ve yatirim ufku uzunlugu icin iki ayri slider/card.
 - OCR islem kontrol ve manuel duzeltme tablosu.
 - Gelir/gider ozetleri.

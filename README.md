@@ -34,7 +34,8 @@ Uygulama iki modla acilir:
   alani ile risk/vade sorulari sayfanin ustunde yan yana tutulur.
 - **Teknik Analiz:** Sunum ve hoca sorulari icin detay ekranidir. OCR kontrolu,
   siniflandirma ozeti, uyelik fonksiyonlari, Mamdani kural aktivasyonlari,
-  agregasyon ve centroid grafikleri burada kalir.
+  agregasyon ve centroid grafikleri burada kalir. OCR duzeltme tablosu bu
+  sekmede acik gelir, ancak kendi icinde kayar.
 
 ## Bulanik Mantik Girdileri
 

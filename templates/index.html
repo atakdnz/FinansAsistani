@@ -221,6 +221,11 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 .txn-table th { color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .txn-table input, .txn-table select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 6px; font: inherit; }
 .txn-table .amount-input { min-width: 80px; }
+.ocr-panel { background: var(--surface); border: 1px solid var(--border); padding: 16px; margin-bottom: 16px; }
+.ocr-panel-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
+.ocr-panel-meta { font-size: 12px; color: var(--text2); text-align: right; }
+.ocr-table-scroll { max-height: 520px; overflow: auto; border: 1px solid var(--border); }
+.ocr-table-scroll .table-wrap { overflow-x: auto; }
 
 canvas { max-width: 100%; }
 .disclaimer { font-size: 11px; color: var(--text3); font-style: italic; padding: 10px 14px; border: 1px solid var(--border); background: var(--surface2); margin-top: 20px; }
@@ -572,6 +577,23 @@ function transactionRowsHtml(rows, options){
       <td>${Number(row.guven).toFixed(2)}<br><span class="stat-sub">${row.yontem||''}</span></td>
     </tr>`).join('')}
     </tbody></table></div>`;
+}
+
+function ocrCorrectionPanelHtml(transactions, options, micro){
+  const count = transactions.length || 0;
+  const microText = micro?.adet ? ` · ${micro.adet} mikro işlem tabloda gizli` : '';
+  return `<div class="ocr-panel">
+    <div class="ocr-panel-head">
+      <div class="card-title" style="margin-bottom:0">OCR İşlem Kontrolü</div>
+      <div class="ocr-panel-meta">${count ? `${count} işlem düzenlenebilir${microText}` : 'PDF yüklendiğinde tablo oluşur'}</div>
+    </div>
+      <div class="stat-sub" style="margin-bottom:10px">OCR ve sınıflandırma sonucu burada kontrol edilir. Gerekirse kategori veya gider tipi düzeltilip kaydedilebilir.</div>
+      <div class="ocr-table-scroll">${transactionRowsHtml(transactions, options)}</div>
+      <div class="action-row" style="margin-top:12px">
+        <button class="btn" id="saveCorrectionsBtn" ${transactions.length?'':'disabled'}>Düzeltmeleri Kaydet</button>
+        <div class="status-text" id="correctionStatus">${transactions.length?'OCR sonucu kontrol edilebilir.':'PDF yüklendiğinde işlem listesi görünür.'}</div>
+      </div>
+  </div>`;
 }
 
 async function saveTransactionCorrections(){
@@ -1007,14 +1029,7 @@ function render(d){
   <!-- 1. OCR İşlem Kontrolü + Sınıflandırma -->
   <div class="section-header">1 — OCR İşlem Kontrolü & Sınıflandırma</div>
   <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
-    <div class="card">
-      <div class="card-title">OCR İşlem Kontrolü</div>
-      ${transactionRowsHtml(transactions, options)}
-      <div class="action-row" style="margin-top:12px">
-        <button class="btn" id="saveCorrectionsBtn" ${transactions.length?'':'disabled'}>Düzeltmeleri Kaydet</button>
-        <div class="status-text" id="correctionStatus">${transactions.length?'OCR sonucu kontrol edilebilir.':'PDF yüklendiğinde işlem listesi görünür.'}</div>
-      </div>
-    </div>
+    ${ocrCorrectionPanelHtml(transactions, options, micro)}
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="card"><div class="card-title">Toplam İşlem</div>
         <div class="stat-val cyan">${fmt(cls.analiz_adedi??cls.toplam)}</div>
