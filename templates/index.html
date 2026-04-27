@@ -43,8 +43,8 @@ header { margin-bottom: 36px; padding-bottom: 28px; border-bottom: 2px solid var
 @media (max-width: 900px) { .main-container { grid-template-columns: 1fr; } }
 
 /* Upload */
-.upload-section { background: var(--surface); border: 1px solid var(--border); padding: 32px; text-align: center; margin-bottom: 22px; }
-.drop-zone { border: 2px dashed var(--border-dark); padding: 40px 20px; cursor: pointer; transition: all .2s; background: var(--bg); }
+.upload-section { background: var(--surface); border: 1px solid var(--border); padding: 32px; text-align: center; margin-bottom: 22px; display: flex; flex-direction: column; }
+.drop-zone { border: 2px dashed var(--border-dark); padding: 40px 20px; cursor: pointer; transition: all .2s; background: var(--bg); flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: #eff6ff; }
 .drop-zone-icon { font-size: 32px; margin-bottom: 10px; }
 .drop-zone h3 { font-family: 'Playfair Display',serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
@@ -1028,26 +1028,22 @@ function render(d){
   <section class="mode-panel" id="techMode">
   <!-- 1. OCR İşlem Kontrolü + Sınıflandırma -->
   <div class="section-header">1 — OCR İşlem Kontrolü & Sınıflandırma</div>
-  <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
-    ${ocrCorrectionPanelHtml(transactions, options, micro)}
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="card"><div class="card-title">Toplam İşlem</div>
-        <div class="stat-val cyan">${fmt(cls.analiz_adedi??cls.toplam)}</div>
-        <div class="stat-sub">${micro.adet?micro.adet+' mikro işlem gizlendi':'Sınıflandırıldı'}</div>
-      </div>
-      <div class="card"><div class="card-title">Düşük Güven</div>
-        <div class="stat-val ${cls.dusuk_guven_adedi?'yellow':'green'}">${fmt(cls.dusuk_guven_adedi)}</div>
-        <div class="stat-sub">Belirsiz kayıt</div>
-      </div>
-      <div class="card"><div class="card-title">Mikro İşlem</div>
-        <div class="stat-val ${micro.adet?'yellow':'green'}">${fmt(micro.adet)}</div>
-        <div class="stat-sub">${micro.adet?fmt(micro.toplam)+' TL, '+micro.esik+' TL altı':'Yok'}</div>
-      </div>
-      <div class="card"><div class="card-title">Yöntem Dağılımı</div>
-        ${Object.entries(cls.yontemler).map(([k,v])=>`<div class="kat-item"><div class="kat-name">${k}</div><div class="kat-amt cyan">${fmt(v)}</div></div>`).join('')||'<div class="stat-sub">Kayıt yok</div>'}
-      </div>
-      ${cls.dusuk_guven_ornekleri.length?`<div class="card"><div class="card-title">Düşük Güvenli Örnekler</div>
-        ${cls.dusuk_guven_ornekleri.map(r=>`<div class="kat-item"><div class="kat-name">${r.aciklama}</div><div class="kat-amt">${r.kategori} · ${r.guven.toFixed(2)}</div></div>`).join('')}</div>`:''}
+  ${ocrCorrectionPanelHtml(transactions, options, micro)}
+  <div class="grid4" style="margin-top:12px">
+    <div class="card"><div class="card-title">Toplam İşlem</div>
+      <div class="stat-val cyan">${fmt(cls.analiz_adedi??cls.toplam)}</div>
+      <div class="stat-sub">${micro.adet?micro.adet+' mikro işlem gizlendi':'Sınıflandırıldı'}</div>
+    </div>
+    <div class="card"><div class="card-title">Düşük Güven</div>
+      <div class="stat-val ${cls.dusuk_guven_adedi?'yellow':'green'}">${fmt(cls.dusuk_guven_adedi)}</div>
+      <div class="stat-sub">Belirsiz kayıt</div>
+    </div>
+    <div class="card"><div class="card-title">Mikro İşlem</div>
+      <div class="stat-val ${micro.adet?'yellow':'green'}">${fmt(micro.adet)}</div>
+      <div class="stat-sub">${micro.adet?fmt(micro.toplam)+' TL, '+micro.esik+' TL altı':'Yok'}</div>
+    </div>
+    <div class="card"><div class="card-title">Yöntem Dağılımı</div>
+      ${Object.entries(cls.yontemler).map(([k,v])=>`<div class="kat-item"><div class="kat-name">${k}</div><div class="kat-amt cyan">${fmt(v)}</div></div>`).join('')||'<div class="stat-sub">Kayıt yok</div>'}
     </div>
   </div>
 
@@ -1059,13 +1055,13 @@ function render(d){
       <div class="stat-sub">Kaynak: ${d.banka.kaynak||'CSV'}</div></div>
     <div class="card"><div class="card-title">Toplam Gider</div>
       <div class="stat-val" style="color:var(--bold)">${fmt(d.banka.toplam_gider)}<span style="font-size:.85rem"> TL</span></div>
-      <div class="stat-sub">12 aylık toplam</div></div>
+      <div class="stat-sub">${(d.banka.monthly?.labels?.length||1)} aylık toplam</div></div>
     <div class="card"><div class="card-title">Aylık Ort. Tasarruf</div>
       <div class="stat-val green">${fmt(d.banka.aylik_tasarruf_ort)}<span style="font-size:.85rem"> TL</span></div>
       <div class="stat-sub">Net birikim</div></div>
     <div class="card"><div class="card-title">Tasarruf Potansiyeli</div>
       <div class="stat-val yellow">${fmt(d.banka.istege_bagli)}<span style="font-size:.85rem"> TL</span></div>
-      <div class="stat-sub">Kısılabilir gider / yıl</div></div>
+      <div class="stat-sub">Kısılabilir gider toplamı</div></div>
   </div>
 
   <!-- 3. Gider Analizi -->

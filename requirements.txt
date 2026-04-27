@@ -1,6 +1,14 @@
+# Ana uygulama (app.py, statement_pdf_pipeline.py, transaction_classifier.py)
 Flask>=3.0
 numpy>=1.26
 pandas>=2.0
-packaging>=23.0
-scipy>=1.11
 scikit-fuzzy>=0.4.2
+scipy>=1.11
+pypdfium2>=4.0
+
+# PaddleOCR — .venv_paddle ortamında ayrıca kurulur
+# paddleocr>=2.9
+# paddlepaddle>=3.0
+
+# Embedding yardımcı sınıflandırıcı — .venv_embed ortamında kurulur
+# sentence-transformers>=2.2

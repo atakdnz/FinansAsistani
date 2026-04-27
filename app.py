@@ -14,11 +14,11 @@ from transaction_classifier import classify_dataframe, classify_transaction, has
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OZET_PATH  = os.path.join(BASE_DIR, "ozet_hesaplar.csv")
-BANKA_PATH = os.path.join(BASE_DIR, "banka_hareketleri.csv")
+DATA_DIR   = os.path.join(BASE_DIR, "data")
+OZET_PATH  = os.path.join(DATA_DIR, "ozet_hesaplar.csv")
+BANKA_PATH = os.path.join(DATA_DIR, "banka_hareketleri.csv")
 EXTRACTED_PATH = os.path.join(BASE_DIR, "extracted_transactions.csv")
 PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
-PDF_NAME_PATH = os.path.join(BASE_DIR, "last_pdf_name.txt")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -92,15 +92,8 @@ def sanitize_json(value):
 
 def load_bank_data():
     if os.path.exists(EXTRACTED_PATH):
-        try:
-            if os.path.exists(PDF_NAME_PATH):
-                with open(PDF_NAME_PATH, encoding="utf-8") as handle:
-                    pdf_name = handle.read().strip()
-            else:
-                pdf_name = "PDF OCR"
-        except OSError:
-            pdf_name = "PDF OCR"
-        return pd.read_csv(EXTRACTED_PATH), pdf_name or "PDF OCR"
+        pdf_name = load_user_profile().get("last_pdf_name", "PDF OCR") or "PDF OCR"
+        return pd.read_csv(EXTRACTED_PATH), pdf_name
     return pd.read_csv(BANKA_PATH), "Demo CSV"
 
 def load_user_profile():
@@ -848,11 +841,9 @@ def upload_statement():
     filename = secure_filename(original_name) or "statement.pdf"
     pdf_path = os.path.join(UPLOAD_DIR, filename)
     uploaded.save(pdf_path)
-    try:
-        with open(PDF_NAME_PATH, "w", encoding="utf-8") as handle:
-            handle.write(original_name)
-    except OSError:
-        pass
+    profile = load_user_profile()
+    profile["last_pdf_name"] = original_name
+    save_user_profile(profile)
 
     rows = process_pdf(Path(pdf_path), Path(EXTRACTED_PATH))
     return jsonify({
@@ -875,11 +866,14 @@ def risk_profile():
     payload = request.get_json(silent=True) or {}
     score = calculate_risk_score(payload)
     horizon = calculate_investment_horizon(payload)
+    existing = load_user_profile()
     profile = {
         "risk_tolerance": round(score, 4),
         "investment_horizon": round(horizon, 4),
         "answers": {k: clamp01(v) for k, v in payload.items()},
     }
+    if "last_pdf_name" in existing:
+        profile["last_pdf_name"] = existing["last_pdf_name"]
     save_user_profile(profile)
     return jsonify(profile)
 
