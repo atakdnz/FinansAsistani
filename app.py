@@ -269,7 +269,7 @@ def _category_advice(category, share, amount, metrics):
         if target_saving:
             detail += f" Hedef kesinti yaklaşık {target_saving:.0f} TL olabilir."
         potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
-        return "Ulaştırma Tasarrufları", potential, detail, "saving" if level != "low" else "info", target_saving
+        return "Ulaştırma Tasarrufları", potential, detail, "saving" if level == "high" else "info", target_saving
 
     if category == "Konut/Fatura":
         detail = "Kira, abonelik ve fatura kalemleri zorunlu tarafta kaldığı için kısa vadede kesinti alanı sınırlı."
@@ -299,7 +299,7 @@ def _category_advice(category, share, amount, metrics):
         if target_saving:
             detail += f" Bu kalemde yaklaşık {target_saving:.0f} TL yatırım bütçesine ayrılabilir."
         potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
-        return "Alışveriş Kontrolü", potential, detail, "saving" if level != "low" else "info", target_saving
+        return "Alışveriş Kontrolü", potential, detail, "saving" if level == "high" else "info", target_saving
 
     if category == "İsteğe Bağlı":
         target_saving = amount * (0.20 if level == "high" else 0.12 if level == "medium" else 0.0)
@@ -307,7 +307,7 @@ def _category_advice(category, share, amount, metrics):
         if target_saving:
             detail += f" Hedef tasarruf yaklaşık {target_saving:.0f} TL."
         potential = "Yüksek tasarruf potansiyeli" if level == "high" else "Orta tasarruf potansiyeli" if level == "medium" else "Düşük tasarruf potansiyeli"
-        return "İsteğe Bağlı Harcamalar", potential, detail, "saving" if level != "low" else "info", target_saving
+        return "İsteğe Bağlı Harcamalar", potential, detail, "saving" if level == "high" else "info", target_saving
 
     if category == "Borç/Kredi/Kart":
         detail = "Kart ve kredi ödemeleri yatırım kararından önce nakit akışında öncelikli izlenmeli."
@@ -650,7 +650,7 @@ def run_fuzzy():
     elif defuzz_val <= 0.66: profil = "Dengeli"
     else:                    profil = "Agresif"
 
-    portfolyolar = {
+    baz_portfolyolar = {
         "Güvenilir": {
             "desc": "Sermaye koruma odaklı, düşük riskli portföy",
             "color": "#22d3ee",
@@ -670,6 +670,38 @@ def run_fuzzy():
                       "Emtia (Petrol/Altın)":15,"Döviz":10,"Girişim/Fon":5}
         },
     }
+
+    def _lerp_items(left, right, ratio):
+        keys = set(left) | set(right)
+        raw = {key: left.get(key, 0) * (1 - ratio) + right.get(key, 0) * ratio for key in keys}
+        raw = {key: value for key, value in raw.items() if value >= 0.5}
+        total = sum(raw.values()) or 1
+        rounded = {key: round(value * 100 / total) for key, value in raw.items()}
+        diff = 100 - sum(rounded.values())
+        if diff and rounded:
+            rounded[max(rounded, key=rounded.get)] += diff
+        return {key: value for key, value in sorted(rounded.items(), key=lambda item: -item[1]) if value > 0}
+
+    def _dynamic_portfolio_items(score):
+        safe = baz_portfolyolar["Güvenilir"]["items"]
+        balanced = baz_portfolyolar["Dengeli"]["items"]
+        aggressive = baz_portfolyolar["Agresif"]["items"]
+        safe_center, balanced_center, aggressive_center = 0.165, 0.50, 0.835
+        if score <= balanced_center:
+            ratio = max(0.0, min(1.0, (score - safe_center) / (balanced_center - safe_center)))
+            return _lerp_items(safe, balanced, ratio)
+        ratio = max(0.0, min(1.0, (score - balanced_center) / (aggressive_center - balanced_center)))
+        return _lerp_items(balanced, aggressive, ratio)
+
+    portfolyolar = {
+        key: {
+            "desc": value["desc"],
+            "color": value["color"],
+            "items": dict(value["items"]),
+        }
+        for key, value in baz_portfolyolar.items()
+    }
+    portfolyolar[profil]["items"] = _dynamic_portfolio_items(defuzz_val)
 
     # MF grafik verileri
     mf_charts = {

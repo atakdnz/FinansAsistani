@@ -33,6 +33,11 @@ BASE_DIR = Path(__file__).resolve().parent
 PADDLE_CACHE_DIR = BASE_DIR / ".paddlex_cache"
 EMBED_PYTHON = BASE_DIR / ".venv_embed" / "bin" / "python"
 EMBED_HELPER = BASE_DIR / "embedding_classifier.py"
+PADDLE_PYTHON_CANDIDATES = [
+    BASE_DIR / ".venv_paddle" / "bin" / "python",
+    BASE_DIR.parent / "FinansAsistani-main2" / ".venv_paddle" / "bin" / "python",
+]
+PADDLE_PYTHON = next((path for path in PADDLE_PYTHON_CANDIDATES if path.exists()), None)
 AMOUNT_RE = re.compile(r"-?\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|-?\d+[.,]\d{2}")
 DATE_RE = re.compile(r"\b\d{2}[./]\d{2}[./]\d{4}\b")
 
@@ -127,10 +132,70 @@ def create_ocr():
     )
 
 
+def _ocr_via_subprocess(image_paths: list[Path]) -> list[OcrToken]:
+    if PADDLE_PYTHON is None:
+        return []
+
+    helper = Path(tempfile.mktemp(suffix="_ocr_worker.py"))
+    helper.write_text(
+        "import json, os, sys\n"
+        "os.environ.setdefault('PADDLE_PDX_CACHE_HOME', sys.argv[1])\n"
+        "from paddleocr import PaddleOCR\n"
+        "ocr = PaddleOCR(\n"
+        "    use_doc_orientation_classify=False,\n"
+        "    use_doc_unwarping=False,\n"
+        "    use_textline_orientation=False,\n"
+        "    text_detection_model_name='PP-OCRv5_mobile_det',\n"
+        "    text_recognition_model_name='latin_PP-OCRv5_mobile_rec',\n"
+        "    text_det_limit_side_len=1600,\n"
+        "    text_det_limit_type='max',\n"
+        ")\n"
+        "results = []\n"
+        "for page_idx, image_path in enumerate(json.loads(sys.argv[2]), start=1):\n"
+        "    for page_result in ocr.predict(image_path):\n"
+        "        texts = page_result.get('rec_texts', [])\n"
+        "        scores = page_result.get('rec_scores', [])\n"
+        "        boxes = page_result.get('rec_boxes', [])\n"
+        "        for text, score, box in zip(texts, scores, boxes):\n"
+        "            if str(text).strip():\n"
+        "                results.append({'text': str(text).strip(), 'score': float(score), 'box': [float(v) for v in box], 'page': page_idx})\n"
+        "print(json.dumps(results, ensure_ascii=False))\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.setdefault("TOKENIZERS_PARALLELISM", "false")
+    try:
+        proc = subprocess.run(
+            [str(PADDLE_PYTHON), str(helper), str(PADDLE_CACHE_DIR), json.dumps([str(path) for path in image_paths])],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=str(BASE_DIR),
+            env=env,
+        )
+    finally:
+        helper.unlink(missing_ok=True)
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"OCR worker hatası:\n{proc.stderr[-800:]}")
+
+    json_line = next((line for line in reversed(proc.stdout.splitlines()) if line.strip().startswith("[")), "[]")
+    raw_tokens = json.loads(json_line)
+    tokens: list[OcrToken] = []
+    for item in raw_tokens:
+        x1, y1, x2, y2 = [float(value) for value in item["box"]]
+        tokens.append(OcrToken(item["text"], item["score"], (x1, y1, x2, y2), item["page"]))
+    return tokens
+
+
 def extract_ocr_tokens(pdf_path: Path) -> list[OcrToken]:
+    image_paths = render_pdf_pages(pdf_path)
+    if PADDLE_PYTHON is not None:
+        return _ocr_via_subprocess(image_paths)
+
     ocr = create_ocr()
     tokens: list[OcrToken] = []
-    for page_index, image_path in enumerate(render_pdf_pages(pdf_path), start=1):
+    for page_index, image_path in enumerate(image_paths, start=1):
         for page_result in ocr.predict(str(image_path)):
             texts = page_result.get("rec_texts", [])
             scores = page_result.get("rec_scores", [])
