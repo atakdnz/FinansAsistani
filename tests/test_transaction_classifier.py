@@ -54,6 +54,29 @@ class TransactionClassifierTests(unittest.TestCase):
         self.assertEqual(result.loc[1, "Gider Tipi"], "Belirsiz")
         self.assertIn("Sınıflandırma Kuralı", result.columns)
 
+    def test_demo_pdf_descriptions_are_rule_classified(self):
+        cases = [
+            ("Banka Kart Aidatı", "-390,00", "Banka Ücreti"),
+            ("Metrobüs İstanbulkart Yükleme", "-500,00", "Ulaştırma"),
+            ("İSPARK - Otopark Ücreti", "-85,00", "Ulaştırma"),
+            ("THY - Uçak Bileti", "-3.850,00", "Ulaştırma"),
+            ("Yemeksepeti - Akşam Yemeği", "-360,00", "Gıda"),
+            ("Kitap Yurdu - Kitap Alımı", "-640,00", "Eğitim"),
+            ("BES Katkı Payı Ödemesi", "-2.500,00", "İsteğe Bağlı"),
+            ("Otomatik Fon Alımı", "-10.000,00", "İsteğe Bağlı"),
+            ("Yatırım Hesabına Virman", "-15.000,00", "İsteğe Bağlı"),
+            ("Amazon Prime Abonelik", "-49,90", "İsteğe Bağlı"),
+            ("LC Waikiki - Giyim", "-870,00", "Alışveriş"),
+            ("Trendyol - Ev Tekstili", "-1.320,00", "Alışveriş"),
+        ]
+
+        for description, amount, category in cases:
+            with self.subTest(description=description):
+                result = classify_transaction(description, amount)
+                self.assertEqual(result.category, category)
+                self.assertEqual(result.method, "rule")
+                self.assertGreaterEqual(result.confidence, 0.75)
+
     def test_transaction_correction_endpoint_accepts_string_amounts(self):
         fd, path = tempfile.mkstemp(suffix=".csv")
         os.close(fd)

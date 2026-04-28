@@ -133,7 +133,20 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
         if has_positive_income_signal(normalized):
             return _result("Gelir", "Gelir", 0.95, "rule", "income_signal", normalized)
 
-    if _contains_any(normalized, ("BSMV", "KOMISYON", "MASRAF", "HAVALE UCRETI", "EFT UCRETI", "FAST UCRETI")):
+    if _contains_any(
+        normalized,
+        (
+            "BSMV",
+            "KOMISYON",
+            "MASRAF",
+            "HAVALE UCRETI",
+            "EFT UCRETI",
+            "FAST UCRETI",
+            "KART AIDATI",
+            "KART AIDAT",
+            "BANKA KART",
+        ),
+    ):
         return _result("Banka Ücreti", "Zorunlu", 0.95, "rule", "bank_fee", normalized)
 
     if _contains_any(normalized, ("KK OTOMATIK ODEME", "KREDI KARTI", "KART ODEME", "KREDI ODEMESI", "BORC ODEME", "TAKSIT")) or normalized == "KREDI":
@@ -147,6 +160,7 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
             "GETIR",
             "YEMEKPAY",
             "YEMEK SEPET",
+            "YEMEKSEPETI",
             "MIGROS",
             "BIM",
             "A101",
@@ -187,17 +201,68 @@ def classify_transaction(description: object, amount: object = 0.0) -> Classific
 
     if _contains_any(
         normalized,
-        ("SHELL", "OPET", "BP", "PETROL", "AKARYAKIT", "UBER", "TAKSI", "IETT", "HGS", "OTOYOL", "METRO", "ARAC BAKIM"),
+        (
+            "SHELL",
+            "OPET",
+            "BP",
+            "PETROL",
+            "AKARYAKIT",
+            "UBER",
+            "TAKSI",
+            "IETT",
+            "HGS",
+            "OTOYOL",
+            "METRO",
+            "METROBUS",
+            "ISTANBULKART",
+            "ISPARK",
+            "OTOPARK",
+            "THY",
+            "UCAK BILETI",
+            "ARAC BAKIM",
+        ),
     ):
         return _result("Ulaştırma", "Zorunlu", 0.85, "rule", "transport", normalized)
 
-    if _contains_any(normalized, ("OKUL", "UNIVERSITE", "DERSHANE", "KURS", "KIRTASIYE", "UDEMY", "COURSERA")):
+    if _contains_any(normalized, ("OKUL", "UNIVERSITE", "DERSHANE", "KURS", "KIRTASIYE", "KITAP", "KITAP YURDU", "UDEMY", "COURSERA")):
         return _result("Eğitim", "Zorunlu", 0.82, "rule", "education", normalized)
 
-    if _contains_any(normalized, ("NETFLIX", "SPOTIFY", "STEAM", "SINEMA", "TATIL", "HOBI")):
+    if _contains_any(
+        normalized,
+        (
+            "BES",
+            "FON ALIM",
+            "FON ALIMI",
+            "YATIRIM HESABI",
+            "YATIRIM HESABINA",
+            "VIRMAN",
+            "NETFLIX",
+            "SPOTIFY",
+            "STEAM",
+            "SINEMA",
+            "TATIL",
+            "HOBI",
+            "ABONELIK",
+            "PRIME",
+        ),
+    ):
         return _result("İsteğe Bağlı", "İsteğe Bağlı", 0.88, "rule", "leisure_subscription", normalized)
 
-    if _contains_any(normalized, ("TRENDYOL", "HEPSIBURADA", "AMAZON", "N11", "LCWAIKIKI", "ZARA", "SANAL POS ALISVERIS")):
+    if _contains_any(
+        normalized,
+        (
+            "TRENDYOL",
+            "HEPSIBURADA",
+            "AMAZON",
+            "N11",
+            "LCWAIKIKI",
+            "LC WAIKIKI",
+            "ZARA",
+            "GIYIM",
+            "EV TEKSTILI",
+            "SANAL POS ALISVERIS",
+        ),
+    ):
         return _result("Alışveriş", "Kısılabilir", 0.75, "rule", "shopping", normalized)
 
     if parsed_amount < 0:
