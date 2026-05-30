@@ -78,7 +78,7 @@ class EmbeddingSuggestion:
 
 @lru_cache(maxsize=1)
 def _load_model() -> SentenceTransformer:
-    return SentenceTransformer(MODEL_NAME)
+    return SentenceTransformer(MODEL_NAME, local_files_only=True)
 
 
 @lru_cache(maxsize=1)
@@ -91,9 +91,13 @@ def _prototype_vectors() -> tuple[list[str], np.ndarray]:
 
 
 def suggest_category(description: str) -> EmbeddingSuggestion:
-    labels, prototypes = _prototype_vectors()
-    model = _load_model()
-    query = model.encode([description], normalize_embeddings=True)
+    try:
+        labels, prototypes = _prototype_vectors()
+        model = _load_model()
+        query = model.encode([description], normalize_embeddings=True)
+    except Exception:
+        return EmbeddingSuggestion("Diğer", 0.0, 0.0, "embedding_unavailable")
+
     scores = np.asarray(query) @ prototypes.T
     best_idx = int(np.argmax(scores[0]))
     score = float(scores[0][best_idx])
